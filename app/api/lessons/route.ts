@@ -34,6 +34,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
 
+  // Deduplicate within the incoming batch by hebrew (last occurrence wins)
+  const seen = new Map<string, VocabItem>()
+  for (const item of items) seen.set(item.hebrew.trim(), item)
+  items = [...seen.values()]
+
   // Task 2.1 — Fetch all existing hebrew values in a single query
   const { data: existingRows, error: fetchError } = await supabase
     .from('vocabulary_items')
