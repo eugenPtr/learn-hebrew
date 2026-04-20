@@ -89,13 +89,12 @@ export default function LessonsDashboard({ lessons }: Props) {
       )}
 
       <div className="mt-auto pt-6">
-        <button
-          disabled
-          className="w-full rounded-xl bg-blue-500 text-white font-semibold py-4 text-lg opacity-40 cursor-not-allowed"
+        <Link
+          href="/practice"
+          className="w-full rounded-xl bg-blue-500 text-white font-semibold py-4 text-lg hover:bg-blue-600 transition flex items-center justify-center"
         >
           Generate Practice Session
-          <span className="ml-2 text-sm font-normal">(coming soon)</span>
-        </button>
+        </Link>
       </div>
     </main>
   )
