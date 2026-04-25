@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+
 type VocabItem = { hebrew: string; english: string }
 
 function isValidItems(data: unknown): data is { items: VocabItem[] } {
@@ -75,17 +77,34 @@ export async function POST(req: NextRequest) {
 
   const lessonId: string = lessonRows[0].id
 
-  // Task 3.2 — Insert net-new vocabulary items if any remain
+  // Insert net-new vocabulary items with TTS audio
   if (newItems.length > 0) {
-    const vocabPayload = newItems.map((item) => ({
+    // Generate TTS for each new item before inserting
+    const audioUrls: string[] = []
+    for (const item of newItems) {
+      const ttsRes = await fetch(`${BASE_URL}/api/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: item.hebrew.trim() }),
+      })
+      if (!ttsRes.ok) {
+        const err = await ttsRes.text()
+        console.error('[api/lessons] TTS failed for item:', item.hebrew, err)
+        return NextResponse.json({ error: `TTS generation failed: ${err}` }, { status: 502 })
+      }
+      const ttsData = await ttsRes.json()
+      audioUrls.push(ttsData.audioUrl)
+    }
+
+    const vocabPayload = newItems.map((item, i) => ({
       lesson_id: lessonId,
       hebrew: item.hebrew.trim(),
       english: item.english,
+      audio_url: audioUrls[i],
     }))
 
     const { error: vocabError } = await supabase.from('vocabulary_items').insert(vocabPayload)
 
-    // Task 4.2 — Catch vocab insert failure without leaving response hanging
     if (vocabError) {
       console.error('[api/lessons] failed to insert vocabulary_items:', vocabError.message)
       return NextResponse.json(

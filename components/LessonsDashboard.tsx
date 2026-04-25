@@ -38,25 +38,18 @@ export default function LessonsDashboard({ lessons }: Props) {
     <main className="flex min-h-screen flex-col gap-6 max-w-lg mx-auto p-6">
       <h1 className="text-2xl font-semibold">My Lessons</h1>
 
-      <Link
-        href="/lesson/new"
-        className="inline-flex items-center justify-center rounded-xl bg-blue-500 text-white font-semibold py-3 px-6 text-base hover:bg-blue-600 transition self-start"
-      >
-        Add Lesson
-      </Link>
-
       {lessons.length === 0 ? (
         <p className="text-gray-500 text-sm text-center mt-8">
           No lessons yet. Add your first lesson to get started!
         </p>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="flex flex-col gap-3 overflow-y-auto max-h-[calc(5*4.5rem)]">
           {lessons.map((lesson, index) => {
             const isExpanded = expanded.has(lesson.id)
             return (
               <li
                 key={lesson.id}
-                className="rounded-xl border border-gray-200 bg-white overflow-hidden"
+                className="rounded-xl border border-gray-200 bg-white overflow-hidden shrink-0"
               >
                 <button
                   onClick={() => toggleLesson(lesson.id)}
@@ -88,14 +81,19 @@ export default function LessonsDashboard({ lessons }: Props) {
         </ul>
       )}
 
-      <div className="mt-auto pt-6">
-        <Link
-          href="/practice"
-          className="w-full rounded-xl bg-blue-500 text-white font-semibold py-4 text-lg hover:bg-blue-600 transition flex items-center justify-center"
-        >
-          Generate Practice Session
-        </Link>
-      </div>
+      <Link
+        href="/lesson/new"
+        className="w-full rounded-xl border border-blue-500 text-blue-500 font-semibold py-3 text-base hover:bg-blue-50 transition flex items-center justify-center"
+      >
+        Add Lesson
+      </Link>
+
+      <Link
+        href="/practice"
+        className="w-full rounded-xl bg-blue-500 text-white font-semibold py-4 text-lg hover:bg-blue-600 transition flex items-center justify-center"
+      >
+        Generate Practice Session
+      </Link>
     </main>
   )
 }
