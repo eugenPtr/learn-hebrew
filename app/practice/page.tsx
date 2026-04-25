@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import HebrewKeyboard from '@/components/HebrewKeyboard'
 import type { VocabularyItem } from '@/lib/flashcard-selection'
@@ -22,6 +22,12 @@ type State =
 export default function PracticePage() {
   const router = useRouter()
   const [state, setState] = useState<State>({ phase: 'picking' })
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const cardIndex = state.phase === 'running' || state.phase === 'revealed' ? state.index : -1
+  useEffect(() => {
+    if (state.phase === 'running') inputRef.current?.focus()
+  }, [state.phase, cardIndex])
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -173,7 +179,7 @@ export default function PracticePage() {
         </div>
 
         <input
-          autoFocus
+          ref={inputRef}
           dir="rtl"
           type="text"
           value={input}
