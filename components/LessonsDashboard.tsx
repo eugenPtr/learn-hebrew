@@ -1,39 +1,20 @@
 'use client'
 
-import { useState } from 'react'
 import Link from 'next/link'
 
-type VocabularyItem = {
+type LessonSummary = {
   id: string
-  hebrew: string
-  english: string
-}
-
-type Lesson = {
-  id: string
+  title: string | null
   created_at: string
-  vocabulary_items: VocabularyItem[]
+  word_count: number
+  position: number
 }
 
 type Props = {
-  lessons: Lesson[]
+  lessons: LessonSummary[]
 }
 
 export default function LessonsDashboard({ lessons }: Props) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
-
-  function toggleLesson(id: string) {
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
-      }
-      return next
-    })
-  }
-
   return (
     <main className="flex min-h-screen flex-col gap-6 max-w-lg mx-auto p-6">
       <h1 className="text-2xl font-semibold">My Lessons</h1>
@@ -44,40 +25,19 @@ export default function LessonsDashboard({ lessons }: Props) {
         </p>
       ) : (
         <ul className="flex flex-col gap-3 overflow-y-auto max-h-[calc(5*4.5rem)]">
-          {lessons.map((lesson, index) => {
-            const isExpanded = expanded.has(lesson.id)
-            return (
-              <li
-                key={lesson.id}
-                className="rounded-xl border border-gray-200 bg-white overflow-hidden shrink-0"
+          {lessons.map((lesson) => (
+            <li key={lesson.id} className="shrink-0">
+              <Link
+                href={`/lesson/${lesson.id}`}
+                className="flex items-center justify-between px-4 py-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition"
               >
-                <button
-                  onClick={() => toggleLesson(lesson.id)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition"
-                  aria-expanded={isExpanded}
-                >
-                  <span className="font-semibold text-gray-800">Lesson {index + 1}</span>
-                  <span className="text-gray-400 text-sm">{isExpanded ? '▲' : '▼'}</span>
-                </button>
-
-                {isExpanded && (
-                  <ul className="flex flex-col divide-y divide-gray-100 border-t border-gray-100">
-                    {lesson.vocabulary_items.map((item) => (
-                      <li key={item.id} className="px-4 py-3 flex flex-col gap-0.5">
-                        <span className="font-bold text-lg leading-tight text-gray-700">
-                          {item.hebrew}
-                        </span>
-                        <span className="text-sm text-gray-500">{item.english}</span>
-                      </li>
-                    ))}
-                    {lesson.vocabulary_items.length === 0 && (
-                      <li className="px-4 py-3 text-sm text-gray-400">No vocabulary items.</li>
-                    )}
-                  </ul>
-                )}
-              </li>
-            )
-          })}
+                <span className="font-semibold text-gray-800">
+                  {lesson.title ?? `Lesson ${lesson.position}`}
+                </span>
+                <span className="text-gray-400 text-sm">{lesson.word_count} words</span>
+              </Link>
+            </li>
+          ))}
         </ul>
       )}
 
