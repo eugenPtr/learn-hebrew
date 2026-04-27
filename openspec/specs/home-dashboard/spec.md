@@ -1,35 +1,28 @@
-### Requirement: Home page fetches all lessons and vocabulary server-side
-The system SHALL fetch all lessons and their associated vocabulary items from Supabase in a single joined query on the server, ordered by `lessons.created_at` ascending (tiebreak: `id` ascending).
+### Requirement: Home page fetches all lessons with title and word count server-side
+The system SHALL fetch all lessons from Supabase on the server, ordered by `created_at` ascending (tiebreak: `id` ascending), including each lesson's `id`, `title`, `created_at`, and a `word_count` aggregate. Vocabulary items SHALL NOT be joined in this query; they are loaded separately by the detail page.
 
 #### Scenario: Lessons exist in the database
 - **WHEN** the user navigates to `/`
-- **THEN** all lessons and their vocabulary items SHALL be loaded server-side before the page is rendered, with no client-side loading spinner
+- **THEN** all lessons SHALL be loaded server-side with their title and word count, with no client-side loading spinner
 
 #### Scenario: Supabase query fails
 - **WHEN** the Supabase fetch throws an error on the server
 - **THEN** the error SHALL propagate and result in a Next.js error boundary (no silent empty state)
 
-### Requirement: Lessons are rendered as a stacked list of expandable cards
-The system SHALL render one card per lesson. Each card SHALL display a header with **Lesson N** (where N is the 1-based chronological position). Clicking the header SHALL toggle the card between collapsed (header only) and expanded (header + vocabulary rows).
+### Requirement: Lessons are rendered as a stacked list of navigable cards
+The system SHALL render one card per lesson. Each card SHALL display the lesson's title (or "Lesson N" fallback where N is the 1-based chronological position) and its word count. Tapping a card SHALL navigate to `/lesson/[id]`. Cards SHALL NOT expand in-place.
 
-#### Scenario: Card starts collapsed
-- **WHEN** the home page first renders
-- **THEN** all lesson cards SHALL be in the collapsed state (vocabulary items not visible)
+#### Scenario: User taps a lesson card
+- **WHEN** the user taps a lesson card on the dashboard
+- **THEN** the user SHALL be navigated to `/lesson/[id]` for that lesson
 
-#### Scenario: User expands a card
-- **WHEN** the user clicks a lesson card header
-- **THEN** that card SHALL expand to show its vocabulary items and all other cards SHALL remain in their current state
+#### Scenario: Lesson with no title shows fallback
+- **WHEN** a lesson card has no title set
+- **THEN** it SHALL display the positional label "Lesson N" and its word count
 
-#### Scenario: User collapses an expanded card
-- **WHEN** the user clicks the header of an already-expanded card
-- **THEN** that card SHALL collapse and hide its vocabulary items
-
-### Requirement: Expanded card shows vocabulary items in read-only rows
-The system SHALL render each vocabulary item as a row containing the Hebrew word (bold, large text) and the English translation below it (small, gray text). No edit or delete controls SHALL be present.
-
-#### Scenario: Expanded lesson with vocabulary
-- **WHEN** a card is expanded and has vocabulary items
-- **THEN** each item SHALL be displayed with Hebrew word prominently styled and English translation in muted small text, with no interactive controls
+#### Scenario: Lesson with a title shows that title
+- **WHEN** a lesson card has a title set
+- **THEN** it SHALL display the title and its word count
 
 ### Requirement: Empty state when no lessons exist
 The system SHALL display a friendly message encouraging the user to add their first lesson when the lessons list is empty.
