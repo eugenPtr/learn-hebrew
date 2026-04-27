@@ -257,7 +257,7 @@ export default function LessonDetailPage() {
             </h1>
             <button
               onClick={() => { setTitleInput(lesson.title ?? ''); setTitleEditing(true) }}
-              className="text-sm text-gray-400 hover:text-gray-600"
+              className="text-sm text-gray-400 hover:text-gray-200"
             >
               Edit
             </button>
@@ -266,7 +266,7 @@ export default function LessonDetailPage() {
       </div>
 
       {/* Vocabulary list */}
-      <ul className="flex flex-col divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+      <ul className="flex flex-col divide-y divide-gray-700 border border-gray-700 rounded-xl overflow-hidden">
         {lesson.vocabulary_items.length === 0 && (
           <li className="px-4 py-4 text-sm text-gray-400 text-center">No words yet.</li>
         )}
@@ -275,7 +275,7 @@ export default function LessonDetailPage() {
 
           if (rowState.mode === 'editing') {
             return (
-              <li key={item.id} className="px-4 py-3 flex flex-col gap-2 bg-gray-50">
+              <li key={item.id} className="px-4 py-3 flex flex-col gap-2 bg-white">
                 <input
                   dir="rtl"
                   value={rowState.hebrew}
@@ -324,18 +324,18 @@ export default function LessonDetailPage() {
           return (
             <li key={item.id} className="px-4 py-3 flex items-center gap-2">
               <div className="flex-1 flex flex-col gap-0.5 min-w-0">
-                <span className="font-bold text-lg leading-tight text-gray-800" dir="rtl">{item.hebrew}</span>
-                <span className="text-sm text-gray-500 truncate">{item.english}</span>
+                <span className="font-bold text-lg leading-tight text-white" dir="rtl">{item.hebrew}</span>
+                <span className="text-sm text-gray-400 truncate">{item.english}</span>
               </div>
               <button
                 onClick={() => openEdit(item)}
-                className="text-xs text-gray-400 hover:text-blue-500 transition-colors px-1"
+                className="text-xs text-gray-300 hover:text-blue-400 transition-colors px-1"
               >
                 Edit
               </button>
               <button
                 onClick={() => deleteWord(item.id)}
-                className="text-xs text-red-400 hover:text-red-600 transition-colors px-1"
+                className="text-xs text-red-400 hover:text-red-300 transition-colors px-1"
               >
                 Delete
               </button>
@@ -345,8 +345,8 @@ export default function LessonDetailPage() {
       </ul>
 
       {/* Add word form */}
-      <div className="flex flex-col gap-3 border border-gray-200 rounded-xl p-4">
-        <p className="text-sm font-medium text-gray-600">Add word</p>
+      <div className="flex flex-col gap-3 border border-gray-700 rounded-xl p-4">
+        <p className="text-sm font-medium text-gray-300">Add word</p>
         <input
           dir="rtl"
           value={addHebrew}
