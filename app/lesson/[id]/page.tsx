@@ -286,7 +286,7 @@ export default function LessonDetailPage() {
                     }))
                   }
                   placeholder="Hebrew"
-                  className="border border-gray-300 rounded px-3 py-2 text-lg text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="border border-gray-300 rounded px-3 py-2 text-lg text-right text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
                 <input
                   value={rowState.english}
@@ -297,7 +297,7 @@ export default function LessonDetailPage() {
                     }))
                   }
                   placeholder="English"
-                  className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  className="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
                 {rowState.error && (
                   <p className="text-red-500 text-xs">{rowState.error}</p>
