@@ -11,6 +11,7 @@ type ReviewItem = WordFields & { known: boolean; loading: boolean }
 
 type TagResponse = {
   hebrew: string
+  english: string | null
   pos: WordFields['pos']
   gender: WordFields['gender']
   binyan: WordFields['binyan']
@@ -69,17 +70,21 @@ export default function ReviewPage() {
           })
           if (!res.ok) throw new Error()
           const tag: TagResponse = await res.json()
+          const newHebrew = tag.hebrew ?? item.hebrew
           setItems((prev) =>
             prev.map((it, idx) =>
               idx === i
                 ? {
                     ...it,
-                    hebrew: tag.hebrew ?? it.hebrew,
+                    hebrew: newHebrew,
+                    english: tag.english ?? it.english,
                     pos: tag.pos,
                     gender: tag.gender,
                     binyan: tag.binyan,
                     root: tag.root,
                     conjugations: tag.conjugations,
+                    // Re-check known with the post-tagging (infinitive) hebrew
+                    known: knownSet.has(newHebrew),
                     loading: false,
                   }
                 : it

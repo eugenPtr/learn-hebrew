@@ -27,6 +27,7 @@ type Tagging = {
   binyan: Binyan | null
   root: string | null
   hebrew_infinitive: string | null
+  english_infinitive: string | null
   conjugations: { present: string[] } | null
 }
 
@@ -39,6 +40,7 @@ Return ONLY a JSON object in this exact format:
   "binyan": "paal" | "nifal" | "piel" | "pual" | "hitpael" | "hifil" | "hufal" | null,
   "root": "<Hebrew root letters, no niqqud, e.g. כתב>" | null,
   "hebrew_infinitive": "<infinitive form if input is a conjugated verb, otherwise null>",
+  "english_infinitive": "<English infinitive 'to X' for verbs, e.g. 'to write', 'to go'>",
   "conjugations": { "present": ["...", "...", "...", "...", "...", "...", "...", "...", "..."] } | null
 }
 
@@ -48,6 +50,7 @@ Rules:
 - "binyan": set ONLY when pos is "verb". null otherwise.
 - "root": set for verbs and nouns (the Semitic root letters, e.g. "כתב" for כותב). null for phrases, conjunctions, adverbs, etc.
 - "hebrew_infinitive": For verbs, ALWAYS provide the canonical infinitive form in Hebrew letters (e.g. "ללכת", "לכתוב"). For irregular verbs where the infinitive equals the base form (e.g. יכול), return that form. null for non-verbs.
+- "english_infinitive": For verbs, ALWAYS provide the English base/infinitive translation starting with "to" (e.g. "to write", "to go", "to be able to"). This is the translation of the infinitive regardless of the input's tense or conjugation. null for non-verbs.
 - "conjugations.present": MANDATORY for all verbs — a 9-element array in fixed pronoun order [ani, ata, at, hoo, hee, anahnoo, atem, hem, hen]. Each element must be ONLY the conjugated verb form in Hebrew letters, WITHOUT the pronoun and WITHOUT any Latin/phonetic text. No niqqud. Example for לכתוב: ["כותב","כותב","כותבת","כותב","כותבת","כותבים","כותבים","כותבים","כותבות"]. CRITICAL: if pos is "verb", conjugations must never be null. null ONLY for non-verbs.
 - All Hebrew text in the response must be in Hebrew letters without niqqud (no vowel points). Never use Latin transliteration.
 - If you cannot confidently classify the word, set pos to "other" and all other fields to null.`
@@ -60,6 +63,7 @@ function isTagging(data: unknown): data is Tagging {
   if (obj.binyan !== null && !BINYAN_VALUES.includes(obj.binyan as Binyan)) return false
   if (obj.root !== null && typeof obj.root !== 'string') return false
   if (obj.hebrew_infinitive !== null && typeof obj.hebrew_infinitive !== 'string') return false
+  if (obj.english_infinitive !== null && typeof obj.english_infinitive !== 'string') return false
   if (obj.conjugations !== null) {
     const c = obj.conjugations as Record<string, unknown>
     if (!Array.isArray(c.present) || c.present.length !== PRONOUN_ORDER.length) return false
@@ -88,7 +92,7 @@ async function callTag(hebrew: string, english: string): Promise<Tagging | null>
 
 async function tagWord(hebrew: string, english: string): Promise<Tagging> {
   const fallback: Tagging = {
-    pos: 'other', gender: null, binyan: null, root: null, hebrew_infinitive: null, conjugations: null,
+    pos: 'other', gender: null, binyan: null, root: null, hebrew_infinitive: null, english_infinitive: null, conjugations: null,
   }
 
   const tagging = await callTag(hebrew, english)
@@ -151,6 +155,9 @@ export async function POST(
 
   if (tagging.hebrew_infinitive) {
     hebrew = normalizeHebrew(tagging.hebrew_infinitive)
+  }
+  if (tagging.english_infinitive) {
+    english = tagging.english_infinitive
   }
 
   // Check if this Hebrew already exists (post-infinitive normalization)
