@@ -9,7 +9,7 @@ export async function GET(
 
   const { data: lesson, error } = await supabase
     .from('lessons')
-    .select('id, title, created_at, vocabulary_items(id, hebrew, english, audio_url)')
+    .select('id, title, created_at, vocabulary_items(id, hebrew, english, audio_url, pos, gender, binyan, root, conjugations)')
     .eq('id', id)
     .single()
 

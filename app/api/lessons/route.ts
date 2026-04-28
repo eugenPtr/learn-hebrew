@@ -3,7 +3,15 @@ import { supabase } from '@/lib/supabase'
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
-type VocabItem = { hebrew: string; english: string }
+type VocabItem = {
+  hebrew: string
+  english: string
+  pos?: string | null
+  gender?: string | null
+  binyan?: string | null
+  root?: string | null
+  conjugations?: { present: string[] } | null
+}
 
 function normalizeHebrew(s: string): string {
   return s.replace(/[֑-ׇ]/g, '').trim()
@@ -152,6 +160,11 @@ export async function POST(req: NextRequest) {
       hebrew: normalizeHebrew(item.hebrew),
       english: item.english,
       audio_url: audioUrls[i],
+      pos: item.pos ?? null,
+      gender: item.gender ?? null,
+      binyan: item.binyan ?? null,
+      root: item.root ?? null,
+      conjugations: item.conjugations ?? null,
     }))
 
     const { error: vocabError } = await supabase.from('vocabulary_items').insert(vocabPayload)

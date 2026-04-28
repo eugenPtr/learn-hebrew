@@ -3,84 +3,126 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import WordCard from '@/components/WordCard'
+import WordEditModal from '@/components/WordEditModal'
+import type { WordFields } from '@/lib/wordTypes'
 
-type Item = { hebrew: string; english: string; known: boolean }
-type SaveState = 'idle' | 'saving' | 'error'
+type ReviewItem = WordFields & { known: boolean; loading: boolean }
+
+type TagResponse = {
+  hebrew: string
+  pos: WordFields['pos']
+  gender: WordFields['gender']
+  binyan: WordFields['binyan']
+  root: WordFields['root']
+  conjugations: WordFields['conjugations']
+}
 
 export default function ReviewPage() {
   const router = useRouter()
-  const [items, setItems] = useState<Item[]>([])
+  const [items, setItems] = useState<ReviewItem[]>([])
   const [ready, setReady] = useState(false)
   const initialized = useRef(false)
-  const [saveState, setSaveState] = useState<SaveState>('idle')
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'error'>('idle')
   const [saveError, setSaveError] = useState('')
-
-  // Edit modal state
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
-  const [editHebrew, setEditHebrew] = useState('')
-  const [editEnglish, setEditEnglish] = useState('')
 
   useEffect(() => {
     if (initialized.current) return
     initialized.current = true
 
     const raw = sessionStorage.getItem('extractedItems')
-
-    if (!raw) {
-      router.replace('/lesson/new')
-      return
-    }
+    if (!raw) { router.replace('/lesson/new'); return }
 
     const extracted: { hebrew: string; english: string }[] = JSON.parse(raw)
 
-    // Query existing hebrew values to mark known items
     ;(async () => {
+      // Check known items
+      let knownSet = new Set<string>()
       try {
         const { data } = await supabase.from('vocabulary_items').select('hebrew')
-        const knownSet = new Set((data ?? []).map((r: { hebrew: string }) => r.hebrew))
-        setItems(extracted.map((item) => ({ ...item, known: knownSet.has(item.hebrew) })))
-      } catch {
-        // Supabase failure — default all to new
-        setItems(extracted.map((item) => ({ ...item, known: false })))
-      } finally {
-        setReady(true)
-      }
+        knownSet = new Set((data ?? []).map((r: { hebrew: string }) => r.hebrew))
+      } catch { /* default all to new */ }
+
+      // Initialise items as loading
+      const initial: ReviewItem[] = extracted.map((item) => ({
+        hebrew: item.hebrew,
+        english: item.english,
+        pos: null,
+        gender: null,
+        binyan: null,
+        root: null,
+        conjugations: null,
+        known: knownSet.has(item.hebrew),
+        loading: true,
+      }))
+      setItems(initial)
+      setReady(true)
+
+      // Tag all items in parallel
+      const tagPromises = extracted.map(async (item, i) => {
+        try {
+          const res = await fetch('/api/tag', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ hebrew: item.hebrew, english: item.english }),
+          })
+          if (!res.ok) throw new Error()
+          const tag: TagResponse = await res.json()
+          setItems((prev) =>
+            prev.map((it, idx) =>
+              idx === i
+                ? {
+                    ...it,
+                    hebrew: tag.hebrew ?? it.hebrew,
+                    pos: tag.pos,
+                    gender: tag.gender,
+                    binyan: tag.binyan,
+                    root: tag.root,
+                    conjugations: tag.conjugations,
+                    loading: false,
+                  }
+                : it
+            )
+          )
+        } catch {
+          setItems((prev) =>
+            prev.map((it, idx) => (idx === i ? { ...it, loading: false } : it))
+          )
+        }
+      })
+
+      await Promise.allSettled(tagPromises)
     })()
   }, [router])
 
   function deleteItem(index: number) {
     setItems((prev) => prev.filter((_, i) => i !== index))
+    if (editingIndex === index) setEditingIndex(null)
   }
 
-  function openEdit(index: number) {
-    setEditingIndex(index)
-    setEditHebrew(items[index].hebrew)
-    setEditEnglish(items[index].english)
-  }
-
-  function saveEdit() {
+  async function handleSaveEdit(updated: WordFields) {
     if (editingIndex === null) return
     setItems((prev) =>
       prev.map((item, i) =>
-        i === editingIndex ? { ...item, hebrew: editHebrew, english: editEnglish } : item
+        i === editingIndex ? { ...item, ...updated } : item
       )
     )
-    setEditingIndex(null)
-  }
-
-  function closeEdit() {
     setEditingIndex(null)
   }
 
   async function handleConfirm() {
     setSaveState('saving')
     setSaveError('')
-
     try {
       const res = await fetch('/api/lessons', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: items.map(({ hebrew, english }) => ({ hebrew, english })) }),
+        body: JSON.stringify({
+          items: items.map(({ hebrew, english, pos, gender, binyan, root, conjugations }) => ({
+            hebrew, english, pos, gender, binyan, root, conjugations,
+          })),
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`)
@@ -100,41 +142,30 @@ export default function ReviewPage() {
     )
   }
 
+  const editingItem = editingIndex !== null ? items[editingIndex] : null
+
   return (
     <>
-      <main className="flex min-h-screen flex-col p-6 gap-6 max-w-lg mx-auto">
-        <h1 className="text-2xl font-semibold">Review</h1>
-        <p className="text-gray-500 text-sm">{items.length} item{items.length !== 1 ? 's' : ''} extracted — tap a row to edit, or delete items you don't want to save.</p>
-
-        <ul className="flex flex-col gap-2">
-          {items.map((item, i) => (
-            <li
-              key={i}
-              onClick={() => openEdit(i)}
-              className={`flex items-center justify-between rounded-xl border px-4 py-3 gap-4 cursor-pointer active:opacity-70
-                ${item.known ? 'opacity-50 bg-gray-50 border-gray-200' : 'bg-white border-gray-200'}`}
-            >
-              <div className="flex flex-col gap-0.5 min-w-0">
-                <span className="font-medium text-lg leading-tight text-gray-700">{item.hebrew}</span>
-                <span className="text-gray-500 text-sm truncate">{item.english}</span>
-                {item.known && (
-                  <span className="text-xs text-gray-400 mt-0.5">Already known</span>
-                )}
-              </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteItem(i) }}
-                className="shrink-0 text-gray-300 hover:text-red-400 transition text-xl leading-none"
-                aria-label="Delete"
-              >
-                ×
-              </button>
-            </li>
-          ))}
-        </ul>
+      <main className="flex min-h-screen flex-col p-6 gap-6 max-w-2xl mx-auto">
+        <h1 className="text-2xl font-semibold text-gray-800">Review</h1>
+        <p className="text-gray-500 text-sm">
+          {items.length} word{items.length !== 1 ? 's' : ''} extracted — click a card to edit, or delete words you don&apos;t want.
+        </p>
 
         {items.length === 0 && (
-          <p className="text-center text-gray-400 text-sm">Nothing left to save.</p>
+          <p className="text-center text-gray-400 text-sm py-8">Nothing left to save.</p>
         )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {items.map((item, i) => (
+            <WordCard
+              key={i}
+              item={item}
+              onClick={() => setEditingIndex(i)}
+              onDelete={() => deleteItem(i)}
+            />
+          ))}
+        </div>
 
         {saveState === 'error' && (
           <p className="text-red-500 text-sm text-center">{saveError}</p>
@@ -150,55 +181,12 @@ export default function ReviewPage() {
         </button>
       </main>
 
-      {/* Edit modal */}
-      {editingIndex !== null && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-sm bg-black/30"
-          onClick={closeEdit}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 flex flex-col gap-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Edit item</h2>
-              <button
-                onClick={closeEdit}
-                className="text-gray-400 hover:text-gray-600 transition text-2xl leading-none"
-                aria-label="Close"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500 font-medium">Hebrew</label>
-              <input
-                type="text"
-                value={editHebrew}
-                onChange={(e) => setEditHebrew(e.target.value)}
-                className="border border-gray-200 rounded-xl px-4 py-3 text-lg text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-blue-300"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500 font-medium">English</label>
-              <input
-                type="text"
-                value={editEnglish}
-                onChange={(e) => setEditEnglish(e.target.value)}
-                className="border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
-              />
-            </div>
-
-            <button
-              onClick={saveEdit}
-              className="rounded-xl bg-blue-500 text-white font-semibold py-3 hover:bg-blue-600 transition"
-            >
-              Save
-            </button>
-          </div>
-        </div>
+      {editingItem !== null && editingIndex !== null && (
+        <WordEditModal
+          item={editingItem}
+          onSave={handleSaveEdit}
+          onClose={() => setEditingIndex(null)}
+        />
       )}
     </>
   )
