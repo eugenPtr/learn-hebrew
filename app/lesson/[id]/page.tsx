@@ -173,34 +173,36 @@ export default function LessonDetailPage() {
         <Link href="/" className="text-blue-500 text-sm self-start">← Back</Link>
 
         {/* Title */}
-        <div className="flex items-center gap-2">
-          {titleEditing ? (
-            <>
-              <input
-                ref={titleInputRef}
-                value={titleInput}
-                onChange={(e) => setTitleInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') saveTitle(); if (e.key === 'Escape') cancelTitle() }}
-                placeholder="Lesson"
-                className="flex-1 text-2xl font-bold border-b-2 border-blue-400 outline-none bg-transparent"
-              />
-              <button onClick={saveTitle} disabled={titleSaving} className="text-sm text-blue-600 font-medium disabled:opacity-50">
-                {titleSaving ? '…' : 'Save'}
-              </button>
-              <button onClick={cancelTitle} className="text-sm text-gray-400">Cancel</button>
-            </>
-          ) : (
-            <>
-              <h1 className="text-2xl font-bold flex-1">{lesson.title ?? 'Lesson'}</h1>
-              <button
-                onClick={() => { setTitleInput(lesson.title ?? ''); setTitleEditing(true) }}
-                className="text-sm text-gray-400 hover:text-gray-200"
-              >
-                Edit
-              </button>
-            </>
-          )}
-        </div>
+        {titleEditing ? (
+          <div className="flex items-center gap-2">
+            <input
+              ref={titleInputRef}
+              value={titleInput}
+              onChange={(e) => setTitleInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') saveTitle(); if (e.key === 'Escape') cancelTitle() }}
+              onBlur={saveTitle}
+              placeholder="Lesson title"
+              className="text-2xl font-bold text-gray-800 bg-transparent border-b-2 border-blue-400 outline-none flex-1 min-w-0"
+            />
+            <button
+              onMouseDown={(e) => { e.preventDefault(); saveTitle() }}
+              disabled={titleSaving}
+              className="text-sm text-blue-500 font-medium hover:text-blue-700 transition shrink-0 disabled:opacity-50"
+            >
+              {titleSaving ? '…' : 'Save'}
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => { setTitleInput(lesson.title ?? ''); setTitleEditing(true) }}
+            className="group flex items-center gap-2 text-left"
+          >
+            <h1 className="text-2xl font-bold text-gray-800">
+              {lesson.title || 'Untitled lesson'}
+            </h1>
+            <span className="text-gray-300 group-hover:text-gray-400 transition text-lg leading-none mt-0.5">✎</span>
+          </button>
+        )}
 
         {/* Word cards */}
         {lesson.vocabulary_items.length === 0 ? (

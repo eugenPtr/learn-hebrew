@@ -192,7 +192,7 @@ export default function ReviewPage() {
             onClick={startEditTitle}
             className="group flex items-center gap-2 text-left"
           >
-            <h1 className={`text-2xl font-semibold ${lessonTitle ? 'text-gray-800' : 'text-gray-400'}`}>
+            <h1 className="text-2xl font-semibold text-gray-800">
               {lessonTitle || 'Untitled lesson'}
             </h1>
             <span className="text-gray-300 group-hover:text-gray-400 transition text-lg leading-none mt-0.5">✎</span>
