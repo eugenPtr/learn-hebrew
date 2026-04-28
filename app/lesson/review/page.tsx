@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import WordCard from '@/components/WordCard'
@@ -27,6 +27,10 @@ export default function ReviewPage() {
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'error'>('idle')
   const [saveError, setSaveError] = useState('')
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
+  const [lessonTitle, setLessonTitle] = useState('')
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
+  const titleInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (initialized.current) return
@@ -101,6 +105,17 @@ export default function ReviewPage() {
     })()
   }, [router])
 
+  function startEditTitle() {
+    setTitleDraft(lessonTitle)
+    setEditingTitle(true)
+    setTimeout(() => titleInputRef.current?.focus(), 0)
+  }
+
+  const commitTitle = useCallback(() => {
+    setLessonTitle(titleDraft.trim())
+    setEditingTitle(false)
+  }, [titleDraft])
+
   function deleteItem(index: number) {
     setItems((prev) => prev.filter((_, i) => i !== index))
     if (editingIndex === index) setEditingIndex(null)
@@ -124,6 +139,7 @@ export default function ReviewPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          title: lessonTitle.trim() || null,
           items: items.map(({ hebrew, english, pos, gender, binyan, root, conjugations }) => ({
             hebrew, english, pos, gender, binyan, root, conjugations,
           })),
@@ -152,7 +168,36 @@ export default function ReviewPage() {
   return (
     <>
       <main className="flex min-h-screen flex-col p-6 gap-6 max-w-2xl mx-auto">
-        <h1 className="text-2xl font-semibold text-gray-800">Review</h1>
+        {editingTitle ? (
+          <div className="flex items-center gap-2">
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') commitTitle(); if (e.key === 'Escape') setEditingTitle(false) }}
+              onBlur={commitTitle}
+              placeholder="Lesson title"
+              className="text-2xl font-semibold text-gray-800 bg-transparent border-b-2 border-blue-400 outline-none flex-1 min-w-0"
+            />
+            <button
+              onMouseDown={(e) => { e.preventDefault(); commitTitle() }}
+              className="text-sm text-blue-500 font-medium hover:text-blue-700 transition shrink-0"
+            >
+              Save
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={startEditTitle}
+            className="group flex items-center gap-2 text-left"
+          >
+            <h1 className={`text-2xl font-semibold ${lessonTitle ? 'text-gray-800' : 'text-gray-400'}`}>
+              {lessonTitle || 'Untitled lesson'}
+            </h1>
+            <span className="text-gray-300 group-hover:text-gray-400 transition text-lg leading-none mt-0.5">✎</span>
+          </button>
+        )}
         <p className="text-gray-500 text-sm">
           {items.length} word{items.length !== 1 ? 's' : ''} extracted — click a card to edit, or delete words you don&apos;t want.
         </p>

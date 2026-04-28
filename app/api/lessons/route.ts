@@ -16,10 +16,11 @@ function normalizeHebrew(s: string): string {
   return s.replace(/[֑-ׇ]/g, '').trim()
 }
 
-function isValidItems(data: unknown): data is { items: VocabItem[] } {
+function isValidItems(data: unknown): data is { title?: string | null; items: VocabItem[] } {
   if (!data || typeof data !== 'object') return false
   const obj = data as Record<string, unknown>
   if (!Array.isArray(obj.items)) return false
+  if ('title' in obj && obj.title !== null && typeof obj.title !== 'string') return false
   return obj.items.every(
     (item) =>
       item &&
@@ -52,6 +53,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   let items: VocabItem[]
+  let title: string | null = null
   try {
     const body = await req.json()
     if (!isValidItems(body)) {
@@ -62,6 +64,7 @@ export async function POST(req: NextRequest) {
       )
     }
     items = body.items
+    title = (body.title as string | null | undefined) ?? null
   } catch {
     console.error('[api/lessons] failed to parse request body')
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
@@ -92,7 +95,7 @@ export async function POST(req: NextRequest) {
   // Create new lesson row first
   const { data: lessonRows, error: lessonError } = await supabase
     .from('lessons')
-    .insert({})
+    .insert({ title: title || null })
     .select('id')
 
   if (lessonError || !lessonRows || lessonRows.length === 0) {
