@@ -52,7 +52,14 @@ export default function LessonsDashboard({ lessons }: Props) {
         href="/practice"
         className="w-full rounded-xl bg-blue-500 text-white font-semibold py-4 text-lg hover:bg-blue-600 transition flex items-center justify-center"
       >
-        Generate Practice Session
+        Flashcards
+      </Link>
+
+      <Link
+        href="/practice/sentences"
+        className="w-full rounded-xl bg-purple-500 text-white font-semibold py-4 text-lg hover:bg-purple-600 transition flex items-center justify-center"
+      >
+        Sentences
       </Link>
     </main>
   )

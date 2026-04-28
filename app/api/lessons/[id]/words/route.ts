@@ -48,7 +48,14 @@ Rules:
 - "pos": always required. Use "phrase" for multi-word idioms, greetings, exclamations.
 - "gender": set when pos is "noun" or "pronoun" where grammatical gender applies (e.g. הוא=masculine, היא=feminine, הם=masculine, הן=feminine, אתה=masculine, את=feminine). null when gender is genuinely absent (e.g. אני, אנחנו) or pos is not noun/pronoun.
 - "binyan": set ONLY when pos is "verb". null otherwise.
-- "root": set for verbs and nouns (the Semitic root letters, e.g. "כתב" for כותב). null for phrases, conjunctions, adverbs, etc.
+- "root": The 3 Semitic root consonants without niqqud. For verbs, extract the root from the infinitive using these binyan-specific rules:
+  • PAAL: strip ל prefix. Lamed-hey verbs: the infinitive ends in ות — replace with ה to recover third root letter (לשתות→שתה, לקנות→קנה, לבנות→בנה). Pe-yod/Pe-nun: first root letter drops — restore it (ללכת→הלך, לרדת→ירד, לשבת→ישב, לתת→נתן). Hollow (ayin-vav/ayin-yod): middle root letter is ו or י (לקום→קום, לשים→שים, לבוא→בוא).
+  • NIFAL: strip להי prefix — remaining letters are the root (להיכנס→כנס, להישאר→שאר, להיפתח→פתח).
+  • PIEL / PUAL: strip ל prefix — the 3 root letters follow directly (לדבר→דבר, לבשל→בשל, לבקש→בקש, לספר→ספר).
+  • HITPAEL: strip להת prefix — remaining 3 letters are the root; lamed-hey: replace final ות→ה (להתלבש→לבש, להתאמן→אמן, להתגלות→גלה).
+  • HIFIL: strip לה prefix, then remove the internal י vowel letter — remaining 3 letters are the root; pe-nun verbs lose their נ — restore it (להכניס→כנס, להרגיש→רגש, להסביר→סבר, להגיד→נגד, להביא→בוא).
+  • HUFAL: same root as the hifil counterpart — strip לה prefix and drop the ו vowel letter (להוכנס→כנס).
+  For nouns: the root is the underlying Semitic root (e.g. ספר for ספר/ספרים, כתב for כתיבה). null for phrases, pronouns, conjunctions, prepositions, adverbs, and other non-derivational words.
 - "hebrew_infinitive": For verbs, ALWAYS provide the canonical infinitive form in Hebrew letters (e.g. "ללכת", "לכתוב"). For irregular verbs where the infinitive equals the base form (e.g. יכול), return that form. null for non-verbs.
 - "english_infinitive": For verbs, ALWAYS provide the English base/infinitive translation starting with "to" (e.g. "to write", "to go", "to be able to"). This is the translation of the infinitive regardless of the input's tense or conjugation. null for non-verbs.
 - "conjugations.present": MANDATORY for all verbs — a 9-element array in fixed pronoun order [ani, ata, at, hoo, hee, anahnoo, atem, hem, hen]. Each element must be ONLY the conjugated verb form in Hebrew letters, WITHOUT the pronoun and WITHOUT any Latin/phonetic text. No niqqud. Example for לכתוב: ["כותב","כותב","כותבת","כותב","כותבת","כותבים","כותבים","כותבים","כותבות"]. CRITICAL: if pos is "verb", conjugations must never be null. null ONLY for non-verbs.
