@@ -48,7 +48,7 @@ Rules:
 - "binyan": set ONLY when pos is "verb". null otherwise.
 - "root": set for verbs and nouns (the Semitic root letters, e.g. "כתב" for כותב). null for phrases, conjunctions, adverbs, etc.
 - "hebrew_infinitive": For verbs, ALWAYS provide the canonical infinitive form in Hebrew letters (e.g. "ללכת", "לכתוב"). For irregular verbs where the infinitive equals the base form (e.g. יכול), return that form. null for non-verbs.
-- "conjugations.present": ONLY for verbs — a 9-element array in fixed pronoun order [ani, ata, at, hoo, hee, anahnoo, atem, hem, hen]. Each element must be ONLY the conjugated verb form in Hebrew letters, WITHOUT the pronoun and WITHOUT any Latin/phonetic text. No niqqud. Example for לכתוב: ["כותב","כותב","כותבת","כותב","כותבת","כותבים","כותבים","כותבים","כותבות"]. null for non-verbs.
+- "conjugations.present": MANDATORY for all verbs — a 9-element array in fixed pronoun order [ani, ata, at, hoo, hee, anahnoo, atem, hem, hen]. Each element must be ONLY the conjugated verb form in Hebrew letters, WITHOUT the pronoun and WITHOUT any Latin/phonetic text. No niqqud. Example for לכתוב: ["כותב","כותב","כותבת","כותב","כותבת","כותבים","כותבים","כותבים","כותבות"]. CRITICAL: if pos is "verb", conjugations must never be null. null ONLY for non-verbs.
 - All Hebrew text in the response must be in Hebrew letters without niqqud (no vowel points). Never use Latin transliteration.
 - If you cannot confidently classify the word, set pos to "other" and all other fields to null.`
 
@@ -68,7 +68,7 @@ function isTagging(data: unknown): data is Tagging {
   return true
 }
 
-async function tagWord(hebrew: string, english: string): Promise<Tagging> {
+async function callTag(hebrew: string, english: string): Promise<Tagging | null> {
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     response_format: { type: 'json_object' },
@@ -77,24 +77,30 @@ async function tagWord(hebrew: string, english: string): Promise<Tagging> {
       { role: 'user', content: `Hebrew: ${hebrew}\nEnglish: ${english}` },
     ],
   })
-
   const raw = completion.choices[0]?.message?.content ?? '{}'
   const parsed = JSON.parse(raw)
-
   if (!isTagging(parsed)) {
     console.error('[api/lessons/[id]/words] tagging validation failed, raw:', raw)
-    // Conservative fallback — never block insert on tagging failure
-    return {
-      pos: 'other',
-      gender: null,
-      binyan: null,
-      root: null,
-      hebrew_infinitive: null,
-      conjugations: null,
-    }
+    return null
+  }
+  return parsed
+}
+
+async function tagWord(hebrew: string, english: string): Promise<Tagging> {
+  const fallback: Tagging = {
+    pos: 'other', gender: null, binyan: null, root: null, hebrew_infinitive: null, conjugations: null,
   }
 
-  return parsed
+  const tagging = await callTag(hebrew, english)
+  if (!tagging) return fallback
+
+  // Retry once if it's a verb missing conjugations
+  if (tagging.pos === 'verb' && !tagging.conjugations) {
+    const retry = await callTag(hebrew, english)
+    if (retry?.conjugations) return retry
+  }
+
+  return tagging
 }
 
 export async function POST(
