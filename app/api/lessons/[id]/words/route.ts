@@ -47,9 +47,9 @@ Rules:
 - "gender": set ONLY when pos is "noun" (masculine or feminine). null otherwise.
 - "binyan": set ONLY when pos is "verb". null otherwise.
 - "root": set for verbs and nouns (the Semitic root letters, e.g. "כתב" for כותב). null for phrases, conjunctions, adverbs, etc.
-- "hebrew_infinitive": ONLY set if the input Hebrew is a conjugated verb form, in which case give the infinitive (e.g. input "הולך" → "ללכת"). Otherwise null.
-- "conjugations.present": ONLY for verbs — a 9-element array in fixed pronoun order [ani, ata, at, hoo, hee, anahnoo, atem, hem, hen]. Plain consonants only, no niqqud. null for non-verbs.
-- All Hebrew text in the response must be without niqqud (no vowel points).
+- "hebrew_infinitive": For verbs, ALWAYS provide the canonical infinitive form in Hebrew letters (e.g. "ללכת", "לכתוב"). For irregular verbs where the infinitive equals the base form (e.g. יכול), return that form. null for non-verbs.
+- "conjugations.present": ONLY for verbs — a 9-element array in fixed pronoun order [ani, ata, at, hoo, hee, anahnoo, atem, hem, hen]. Each element must be ONLY the conjugated verb form in Hebrew letters, WITHOUT the pronoun and WITHOUT any Latin/phonetic text. No niqqud. Example for לכתוב: ["כותב","כותב","כותבת","כותב","כותבת","כותבים","כותבים","כותבים","כותבות"]. null for non-verbs.
+- All Hebrew text in the response must be in Hebrew letters without niqqud (no vowel points). Never use Latin transliteration.
 - If you cannot confidently classify the word, set pos to "other" and all other fields to null.`
 
 function isTagging(data: unknown): data is Tagging {
