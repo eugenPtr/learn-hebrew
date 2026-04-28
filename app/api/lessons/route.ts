@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+import { generateTtsAudio } from '@/lib/tts'
 
 type VocabItem = {
   hebrew: string
@@ -141,18 +140,14 @@ export async function POST(req: NextRequest) {
   if (newItems.length > 0) {
     const audioUrls: string[] = []
     for (const item of newItems) {
-      const ttsRes = await fetch(`${BASE_URL}/api/tts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: normalizeHebrew(item.hebrew) }),
-      })
-      if (!ttsRes.ok) {
-        const err = await ttsRes.text()
-        console.error('[api/lessons] TTS failed for item:', item.hebrew, err)
-        return NextResponse.json({ error: `TTS generation failed: ${err}` }, { status: 502 })
+      try {
+        const audioUrl = await generateTtsAudio(normalizeHebrew(item.hebrew))
+        audioUrls.push(audioUrl)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        console.error('[api/lessons] TTS failed for item:', item.hebrew, message)
+        return NextResponse.json({ error: `TTS generation failed: ${message}` }, { status: 502 })
       }
-      const ttsData = await ttsRes.json()
-      audioUrls.push(ttsData.audioUrl)
     }
 
     const vocabPayload = newItems.map((item, i) => ({

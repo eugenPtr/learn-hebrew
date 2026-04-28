@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { supabase } from '@/lib/supabase'
 import { embedText } from '@/lib/embeddings'
+import { generateTtsAudio } from '@/lib/tts'
 import { normalizeHebrew, PRONOUN_ORDER } from '@/lib/hebrew'
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 const POS_VALUES = [
@@ -183,23 +183,10 @@ export async function POST(
   let audioUrl: string
   let embedding: number[]
   try {
-    const [ttsRes, emb] = await Promise.all([
-      fetch(`${BASE_URL}/api/tts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: hebrew }),
-      }),
+    ;[audioUrl, embedding] = await Promise.all([
+      generateTtsAudio(hebrew),
       embedText(english),
     ])
-
-    if (!ttsRes.ok) {
-      const err = await ttsRes.text()
-      console.error('[api/lessons/[id]/words] TTS failed:', err)
-      return NextResponse.json({ error: `TTS generation failed: ${err}` }, { status: 502 })
-    }
-
-    audioUrl = (await ttsRes.json()).audioUrl
-    embedding = emb
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[api/lessons/[id]/words] TTS/embed failed:', message)
