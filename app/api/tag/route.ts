@@ -29,7 +29,7 @@ Return ONLY a JSON object in this exact format:
 
 Rules:
 - "pos": always required. Use "phrase" for multi-word idioms, greetings, exclamations.
-- "gender": set ONLY when pos is "noun" (masculine or feminine). null otherwise.
+- "gender": set when pos is "noun" or "pronoun" where grammatical gender applies (e.g. הוא=masculine, היא=feminine, הם=masculine, הן=feminine, אתה=masculine, את=feminine). null when gender is genuinely absent (e.g. אני, אנחנו) or pos is not noun/pronoun.
 - "binyan": set ONLY when pos is "verb". null otherwise.
 - "root": set for verbs and nouns (the Semitic root letters, e.g. "כתב" for כותב). null for phrases, conjunctions, adverbs, etc.
 - "hebrew_infinitive": For verbs, ALWAYS provide the canonical infinitive form in Hebrew letters (e.g. "ללכת", "לכתוב"). For irregular verbs where the infinitive equals the base form (e.g. יכול), return that form. null for non-verbs.

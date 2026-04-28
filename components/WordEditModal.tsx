@@ -35,7 +35,7 @@ export default function WordEditModal({ item, onSave, onClose }: Props) {
 
   function handlePosChange(newPos: Pos | null) {
     setPos(newPos)
-    if (newPos !== 'noun') setGender(null)
+    if (newPos !== 'noun' && newPos !== 'pronoun') setGender(null)
     if (newPos !== 'verb') setBinyan(null)
   }
 
@@ -64,7 +64,7 @@ export default function WordEditModal({ item, onSave, onClose }: Props) {
         hebrew: hebrew.trim(),
         english: english.trim(),
         pos,
-        gender: pos === 'noun' ? gender : null,
+        gender: (pos === 'noun' || pos === 'pronoun') ? gender : null,
         binyan: pos === 'verb' ? binyan : null,
         root: root.trim() || null,
         conjugations,
@@ -136,8 +136,8 @@ export default function WordEditModal({ item, onSave, onClose }: Props) {
             </select>
           </div>
 
-          {/* Gender — noun only */}
-          {pos === 'noun' && (
+          {/* Gender — noun and pronoun */}
+          {(pos === 'noun' || pos === 'pronoun') && (
             <div className="flex flex-col gap-2">
               <label className="text-xs font-medium text-gray-500">Gender</label>
               <div className="flex gap-3">

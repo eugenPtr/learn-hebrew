@@ -64,7 +64,7 @@ export default function WordCard({ item, onClick, onDelete }: Props) {
                   {pos}
                 </span>
               )}
-              {pos === 'noun' && gender && (
+              {(pos === 'noun' || pos === 'pronoun') && gender && (
                 <span className={`rounded-full px-2 py-0.5 font-medium
                   ${gender === 'masculine' ? 'bg-sky-50 text-sky-700' : 'bg-pink-50 text-pink-700'}`}>
                   {gender === 'masculine' ? 'm' : 'f'}
