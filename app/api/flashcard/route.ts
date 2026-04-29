@@ -2,18 +2,27 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { activeStrategy, VocabularyItem } from '@/lib/flashcard-selection'
 
+const MAX_LESSON_COUNT = 30
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
+  const lessonId = searchParams.get('lessonId')
   const countParam = searchParams.get('count')
   const count = countParam !== null ? parseInt(countParam, 10) : 10
 
-  if (isNaN(count) || count <= 0) {
+  if (!lessonId && (isNaN(count) || count <= 0)) {
     return NextResponse.json({ error: 'count must be a positive integer' }, { status: 400 })
   }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('vocabulary_items')
     .select('id, hebrew, english, audio_url, last_used_at, last_mistake_at')
+
+  if (lessonId) {
+    query = query.eq('lesson_id', lessonId)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     console.error('[api/flashcard] GET failed:', error.message)
@@ -28,6 +37,11 @@ export async function GET(req: NextRequest) {
     last_used_at: row.last_used_at ?? null,
     last_mistake_at: row.last_mistake_at ?? null,
   }))
+
+  if (lessonId) {
+    const selected = activeStrategy.select(items, Math.min(items.length, MAX_LESSON_COUNT))
+    return NextResponse.json(selected)
+  }
 
   const selected = activeStrategy.select(items, count)
   return NextResponse.json(selected)

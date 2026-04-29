@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import HebrewKeyboard from '@/components/HebrewKeyboard'
 import { normalizeHebrew } from '@/lib/hebrew'
@@ -21,29 +22,65 @@ type Sentence = {
 type State =
   | { phase: 'picking'; themes: Theme[] }
   | { phase: 'loading-themes' }
-  | { phase: 'generating'; theme: Theme }
-  | { phase: 'running'; theme: Theme; deck: Sentence[]; index: number; input: string }
-  | { phase: 'revealed'; theme: Theme; deck: Sentence[]; index: number; input: string }
+  | { phase: 'generating'; theme: Theme | null }
+  | { phase: 'running'; theme: Theme | null; deck: Sentence[]; index: number; input: string }
+  | { phase: 'revealed'; theme: Theme | null; deck: Sentence[]; index: number; input: string }
   | { phase: 'feedback'; theme: Theme; deck: Sentence[]; index: number; input: string; feedback: string; rating: 'up' | 'down' }
-  | { phase: 'summary'; theme: Theme }
+  | { phase: 'summary'; theme: Theme | null }
 
 export default function SentencesPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const itemIdsParam = searchParams.get('itemIds')
+  const isItemIdsMode = !!itemIdsParam
+
   const [state, setState] = useState<State>({ phase: 'loading-themes' })
   const [error, setError] = useState<string | null>(null)
   const [audioUrls, setAudioUrls] = useState<Record<number, string>>({})
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    fetch('/api/themes')
-      .then((r) => r.json())
-      .then((themes: Theme[]) => setState({ phase: 'picking', themes }))
-      .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+    if (isItemIdsMode) {
+      // Skip theme loading — auto-start with item IDs
+      const ids = itemIdsParam!.split(',').filter(Boolean)
+      setState({ phase: 'generating', theme: null })
+      startWithItemIds(ids)
+    } else {
+      fetch('/api/themes')
+        .then((r) => r.json())
+        .then((themes: Theme[]) => setState({ phase: 'picking', themes }))
+        .catch((err) => setError(err instanceof Error ? err.message : String(err)))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const focusKey = state.phase === 'running' ? state.index : -1
   useEffect(() => {
     if (state.phase === 'running') inputRef.current?.focus()
   }, [state.phase, focusKey])
+
+  async function startWithItemIds(ids: string[]) {
+    setError(null)
+    setAudioUrls({})
+    try {
+      const res = await fetch('/api/practice/sentences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemIds: ids, count: 5 }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: `Failed: ${res.status}` }))
+        throw new Error(err.error ?? 'Failed to generate sentences')
+      }
+      const { sentences } = (await res.json()) as { sentences: Sentence[] }
+      if (!sentences || sentences.length === 0) throw new Error('No sentences returned')
+      setState({ phase: 'running', theme: null, deck: sentences, index: 0, input: '' })
+      prefetchTts(sentences)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+      setState({ phase: 'summary', theme: null })
+    }
+  }
 
   async function pickTheme(theme: Theme) {
     setError(null)
@@ -60,29 +97,29 @@ export default function SentencesPage() {
         throw new Error(err.error ?? 'Failed to generate sentences')
       }
       const { sentences } = (await res.json()) as { sentences: Sentence[] }
-      if (!sentences || sentences.length === 0) {
-        throw new Error('No sentences returned')
-      }
+      if (!sentences || sentences.length === 0) throw new Error('No sentences returned')
       setState({ phase: 'running', theme, deck: sentences, index: 0, input: '' })
-
-      // Generate TTS for all sentences in the background (best-effort)
-      sentences.forEach((s, i) => {
-        fetch('/api/tts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: s.hebrew }),
-        })
-          .then((r) => r.json())
-          .then((data: { audioUrl?: string }) => {
-            if (data.audioUrl) setAudioUrls((prev) => ({ ...prev, [i]: data.audioUrl! }))
-          })
-          .catch(() => {})
-      })
+      prefetchTts(sentences)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       const themes = (await fetch('/api/themes').then((r) => r.json())) as Theme[]
       setState({ phase: 'picking', themes })
     }
+  }
+
+  function prefetchTts(sentences: Sentence[]) {
+    sentences.forEach((s, i) => {
+      fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: s.hebrew }),
+      })
+        .then((r) => r.json())
+        .then((data: { audioUrl?: string }) => {
+          if (data.audioUrl) setAudioUrls((prev) => ({ ...prev, [i]: data.audioUrl! }))
+        })
+        .catch(() => {})
+    })
   }
 
   function checkAnswer() {
@@ -91,8 +128,8 @@ export default function SentencesPage() {
   }
 
   function goToFeedback(rating: 'up' | 'down') {
-    if (state.phase !== 'revealed') return
-    setState({ ...state, phase: 'feedback', feedback: '', rating })
+    if (state.phase !== 'revealed' || !state.theme) return
+    setState({ ...state, phase: 'feedback', feedback: '', rating, theme: state.theme })
   }
 
   function advanceFromRevealed() {
@@ -179,14 +216,34 @@ export default function SentencesPage() {
   if (state.phase === 'generating') {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-3 p-6">
-        <p className="text-gray-300 text-sm">Generating sentences for</p>
-        <p className="text-xl font-bold">{state.theme.name}</p>
+        {state.theme ? (
+          <>
+            <p className="text-gray-300 text-sm">Generating sentences for</p>
+            <p className="text-xl font-bold">{state.theme.name}</p>
+          </>
+        ) : (
+          <p className="text-gray-300 text-sm">Generating sentences…</p>
+        )}
         <p className="text-gray-500 text-xs">This usually takes a few seconds…</p>
       </div>
     )
   }
 
   if (state.phase === 'summary') {
+    if (isItemIdsMode || !state.theme) {
+      return (
+        <main className="flex flex-col items-center justify-center min-h-screen gap-6 p-6 max-w-sm mx-auto">
+          <h1 className="text-2xl font-bold">All done!</h1>
+          {error && <p className="text-red-500 text-sm">{error}</p>}
+          <button
+            onClick={() => router.push('/')}
+            className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+          >
+            Done
+          </button>
+        </main>
+      )
+    }
     return (
       <main className="flex flex-col items-center justify-center min-h-screen gap-6 p-6 max-w-sm mx-auto">
         <h1 className="text-2xl font-bold">All done!</h1>
@@ -210,7 +267,15 @@ export default function SentencesPage() {
   if (state.phase === 'running') {
     return (
       <div className="flex flex-col items-center min-h-screen p-6 pt-10 max-w-sm mx-auto gap-6">
-        <p className="self-end text-sm text-gray-400">{remaining} sentence{remaining !== 1 ? 's' : ''} left</p>
+        <div className="w-full flex justify-between items-center">
+          <button
+            onClick={() => router.push('/')}
+            className="text-sm text-gray-400 hover:text-gray-200 transition-colors"
+          >
+            End practice
+          </button>
+          <p className="text-sm text-gray-400">{remaining} sentence{remaining !== 1 ? 's' : ''} left</p>
+        </div>
 
         <div className="w-full rounded-xl border border-gray-200 p-6 text-center shadow-sm bg-white">
           <p className="text-sm text-gray-400 mb-1">Translate to Hebrew</p>
@@ -246,10 +311,19 @@ export default function SentencesPage() {
   if (state.phase === 'revealed') {
     const correct = normalizeHebrew(state.input) === normalizeHebrew(current.hebrew)
     const audioUrl = audioUrls[index]
+    const hasTheme = !!state.theme
 
     return (
       <div className="flex flex-col items-center min-h-screen p-6 pt-10 max-w-sm mx-auto gap-5">
-        <p className="self-end text-sm text-gray-400">{remaining} sentence{remaining !== 1 ? 's' : ''} left</p>
+        <div className="w-full flex justify-between items-center">
+          <button
+            onClick={() => router.push('/')}
+            className="text-sm text-gray-400 hover:text-gray-200 transition-colors"
+          >
+            End practice
+          </button>
+          <p className="text-sm text-gray-400">{remaining} sentence{remaining !== 1 ? 's' : ''} left</p>
+        </div>
 
         <div className="w-full rounded-xl border border-gray-200 p-6 text-center shadow-sm bg-white">
           <p className="text-sm text-gray-400 mb-1">English</p>
@@ -281,20 +355,23 @@ export default function SentencesPage() {
           <p className="text-3xl font-bold text-blue-900 text-center" dir="rtl">{current.hebrew}</p>
         </div>
 
-        <div className="flex gap-3 w-full">
-          <button
-            onClick={() => goToFeedback('up')}
-            className="flex-1 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
-          >
-            👍 Good
-          </button>
-          <button
-            onClick={() => goToFeedback('down')}
-            className="flex-1 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
-          >
-            👎 Bad
-          </button>
-        </div>
+        {hasTheme ? (
+          <div className="flex gap-3 w-full">
+            <button
+              onClick={() => goToFeedback('up')}
+              className="flex-1 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
+            >
+              👍 Good
+            </button>
+            <button
+              onClick={() => goToFeedback('down')}
+              className="flex-1 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+            >
+              👎 Bad
+            </button>
+          </div>
+        ) : null}
+
         <button
           onClick={advanceFromRevealed}
           className="w-full py-3 border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors font-medium"
@@ -306,9 +383,18 @@ export default function SentencesPage() {
   }
 
   // feedback phase
-  const isGood = state.rating === 'up'
+  const isGood = state.phase === 'feedback' && state.rating === 'up'
   return (
     <div className="flex flex-col items-center min-h-screen p-6 pt-10 max-w-sm mx-auto gap-5">
+      <div className="w-full flex justify-between items-center">
+        <button
+          onClick={() => router.push('/')}
+          className="text-sm text-gray-400 hover:text-gray-200 transition-colors"
+        >
+          End practice
+        </button>
+      </div>
+
       <div className="w-full rounded-xl border border-gray-200 p-4 text-center bg-white">
         <p className="text-sm text-gray-400 mb-1">{current.english}</p>
         <p className="text-2xl text-gray-900" dir="rtl">{current.hebrew}</p>
@@ -318,8 +404,8 @@ export default function SentencesPage() {
         {isGood ? 'Any notes on this sentence? (optional)' : 'What was wrong with this sentence? (optional)'}
       </p>
       <textarea
-        value={state.feedback}
-        onChange={(e) => setState({ ...state, feedback: e.target.value })}
+        value={state.phase === 'feedback' ? state.feedback : ''}
+        onChange={(e) => state.phase === 'feedback' && setState({ ...state, feedback: e.target.value })}
         placeholder={isGood ? 'e.g. great example, used it in context…' : 'e.g. too formal, weird word choice, ungrammatical…'}
         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         rows={3}
@@ -327,7 +413,7 @@ export default function SentencesPage() {
       />
 
       <button
-        onClick={() => submitFeedback(state.feedback.trim() || null)}
+        onClick={() => state.phase === 'feedback' && submitFeedback(state.feedback.trim() || null)}
         className={`w-full py-3 text-white rounded-lg font-medium transition-colors ${isGood ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
       >
         Submit

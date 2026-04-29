@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import HebrewKeyboard from '@/components/HebrewKeyboard'
+import LessonList from '@/components/LessonList'
+import type { LessonSummary } from '@/components/LessonList'
 import type { VocabularyItem } from '@/lib/flashcard-selection'
 
 // Strip Hebrew nikud/cantillation marks (U+0591–U+05C7) then trim
@@ -13,41 +15,56 @@ function normalize(s: string): string {
 type CardResult = { itemId: string; mistakeMade: boolean }
 
 type State =
-  | { phase: 'picking' }
-  | { phase: 'loading' }
+  | { phase: 'loading-lessons' }
+  | { phase: 'picking'; lessons: LessonSummary[] }
+  | { phase: 'loading'; lessons: LessonSummary[] }
   | { phase: 'running'; deck: VocabularyItem[]; index: number; results: CardResult[]; input: string }
   | { phase: 'revealed'; deck: VocabularyItem[]; index: number; results: CardResult[]; input: string; audio: HTMLAudioElement | null }
   | { phase: 'summary'; results: CardResult[]; total: number }
 
 export default function PracticePage() {
   const router = useRouter()
-  const [state, setState] = useState<State>({ phase: 'picking' })
+  const [state, setState] = useState<State>({ phase: 'loading-lessons' })
   const inputRef = useRef<HTMLInputElement>(null)
 
   const cardIndex = state.phase === 'running' || state.phase === 'revealed' ? state.index : -1
   useEffect(() => {
     if (state.phase === 'running') inputRef.current?.focus()
   }, [state.phase, cardIndex])
+
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  async function startSession(count: number) {
-    setState({ phase: 'loading' })
+  useEffect(() => {
+    fetch('/api/lessons')
+      .then((r) => r.json())
+      .then((data: Array<{ id: string; title: string | null; created_at: string; word_count: number }>) => {
+        const lessons: LessonSummary[] = data.map((l, i) => ({ ...l, position: i + 1 }))
+        setState({ phase: 'picking', lessons })
+      })
+      .catch((err) => {
+        setFetchError(err instanceof Error ? err.message : String(err))
+        setState({ phase: 'picking', lessons: [] })
+      })
+  }, [])
+
+  async function startSession(lesson: LessonSummary, lessons: LessonSummary[]) {
+    setState({ phase: 'loading', lessons })
     setFetchError(null)
     try {
-      const res = await fetch(`/api/flashcard?count=${count}`)
+      const res = await fetch(`/api/flashcard?lessonId=${lesson.id}`)
       if (!res.ok) throw new Error(`Failed to load cards: ${res.status}`)
       const deck: VocabularyItem[] = await res.json()
       if (deck.length === 0) {
-        setFetchError('No vocabulary items found. Add some lessons first.')
-        setState({ phase: 'picking' })
+        setFetchError(`"${lesson.title ?? `Lesson ${lesson.position}`}" has no vocabulary items.`)
+        setState({ phase: 'picking', lessons })
         return
       }
       setState({ phase: 'running', deck, index: 0, results: [], input: '' })
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : String(err))
-      setState({ phase: 'picking' })
+      setState({ phase: 'picking', lessons })
     }
   }
 
@@ -56,7 +73,6 @@ export default function PracticePage() {
     const { deck, index, results, input } = state
     const card = deck[index]
     if (normalize(input) === normalize(card.hebrew)) {
-      // Correct
       const newResults = [...results, { itemId: card.id, mistakeMade: false }]
       const newDeck = deck.filter((_, i) => i !== index)
       if (newDeck.length === 0) {
@@ -66,7 +82,6 @@ export default function PracticePage() {
         setState({ phase: 'running', deck: newDeck, index: nextIndex, results: newResults, input: '' })
       }
     } else {
-      // Wrong
       const newResults = [...results, { itemId: card.id, mistakeMade: true }]
       const audio = card.audio_url ? new Audio(card.audio_url) : null
       setState({ phase: 'revealed', deck, index, results: newResults, input, audio })
@@ -85,7 +100,6 @@ export default function PracticePage() {
   function continueAfterRevealed() {
     if (state.phase !== 'revealed') return
     const { deck, index, results } = state
-    // Re-insert card at random position >= index + 3, or end if fewer than 3 remain
     const card = deck[index]
     const remaining = deck.filter((_, i) => i !== index)
     const minPos = Math.min(index + 3, remaining.length)
@@ -112,26 +126,37 @@ export default function PracticePage() {
     }
   }
 
-  // --- Picking ---
+  function handleGenerateSentences() {
+    if (state.phase !== 'summary') return
+    const uniqueIds = [...new Set(state.results.map((r) => r.itemId))]
+    router.push(`/practice/sentences?itemIds=${uniqueIds.join(',')}`)
+  }
+
+  // --- Loading lessons ---
+  if (state.phase === 'loading-lessons') {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-gray-400">Loading lessons…</p>
+      </div>
+    )
+  }
+
+  // --- Picking / Loading session ---
   if (state.phase === 'picking' || state.phase === 'loading') {
     const loading = state.phase === 'loading'
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-6 p-6">
+      <div className="flex flex-col min-h-screen gap-6 max-w-lg mx-auto p-6">
         <h1 className="text-2xl font-bold">Flashcard Practice</h1>
-        <p className="text-gray-500">How many words?</p>
+        <p className="text-gray-500 text-sm">Pick a lesson to practice.</p>
         {fetchError && <p className="text-red-600 text-sm">{fetchError}</p>}
-        <div className="flex flex-col gap-3 w-48">
-          {[10, 20, 30].map((n) => (
-            <button
-              key={n}
-              disabled={loading}
-              onClick={() => startSession(n)}
-              className="w-full py-3 text-lg font-medium border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
-            >
-              {loading ? '…' : `${n} words`}
-            </button>
-          ))}
-        </div>
+        {loading ? (
+          <p className="text-gray-400 text-sm text-center mt-4">Loading cards…</p>
+        ) : (
+          <LessonList
+            lessons={state.lessons}
+            onSelect={(lesson) => startSession(lesson, state.lessons)}
+          />
+        )}
       </div>
     )
   }
@@ -153,6 +178,12 @@ export default function PracticePage() {
           <p className="text-red-600 text-sm">Failed to save: {submitError}</p>
         )}
         <button
+          onClick={handleGenerateSentences}
+          className="w-full bg-purple-600 text-white rounded-lg py-3 font-medium hover:bg-purple-700 transition-colors"
+        >
+          Generate sentences with these words
+        </button>
+        <button
           onClick={handleDone}
           disabled={submitting}
           className="w-full bg-gray-800 text-white rounded-lg py-3 font-medium hover:bg-gray-900 disabled:opacity-50 transition-colors"
@@ -171,7 +202,15 @@ export default function PracticePage() {
   if (state.phase === 'running') {
     return (
       <div className="flex flex-col items-center min-h-screen p-6 pt-10 max-w-sm mx-auto gap-6">
-        <p className="self-end text-sm text-gray-400">{remaining} card{remaining !== 1 ? 's' : ''} left</p>
+        <div className="w-full flex justify-between items-center">
+          <button
+            onClick={() => router.push('/')}
+            className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            End practice
+          </button>
+          <p className="text-sm text-gray-400">{remaining} card{remaining !== 1 ? 's' : ''} left</p>
+        </div>
 
         <div className="w-full rounded-xl border border-gray-200 p-6 text-center shadow-sm">
           <p className="text-sm text-gray-400 mb-1">Translate to Hebrew</p>
@@ -216,7 +255,15 @@ export default function PracticePage() {
   const { audio } = state
   return (
     <div className="flex flex-col items-center min-h-screen p-6 pt-10 max-w-sm mx-auto gap-6">
-      <p className="self-end text-sm text-gray-400">{remaining} card{remaining !== 1 ? 's' : ''} left</p>
+      <div className="w-full flex justify-between items-center">
+        <button
+          onClick={() => router.push('/')}
+          className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          End practice
+        </button>
+        <p className="text-sm text-gray-400">{remaining} card{remaining !== 1 ? 's' : ''} left</p>
+      </div>
 
       <div className="w-full rounded-xl border border-gray-200 p-6 text-center shadow-sm">
         <p className="text-sm text-gray-400 mb-1">Translate to Hebrew</p>
