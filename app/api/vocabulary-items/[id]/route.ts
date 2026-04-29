@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { embedText } from '@/lib/embeddings'
 import { normalizeHebrew } from '@/lib/hebrew'
-
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+import { generateTtsAudio } from '@/lib/tts'
 
 const POS_VALUES = [
   'noun', 'verb', 'adjective', 'adverb',
@@ -199,19 +198,14 @@ export async function PATCH(
   }
 
   // No conflict — update hebrew, regen TTS, re-embed if english changed
-  const ttsRes = await fetch(`${BASE_URL}/api/tts`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: patch.hebrew }),
-  })
-
-  if (!ttsRes.ok) {
-    const err = await ttsRes.text()
-    console.error('[api/vocabulary-items/[id]] TTS regen failed:', err)
-    return NextResponse.json({ error: `TTS generation failed: ${err}` }, { status: 502 })
+  let audioUrl: string
+  try {
+    audioUrl = await generateTtsAudio(patch.hebrew!)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[api/vocabulary-items/[id]] TTS regen failed:', message)
+    return NextResponse.json({ error: `TTS generation failed: ${message}` }, { status: 502 })
   }
-
-  const { audioUrl } = await ttsRes.json()
 
   const update: Record<string, unknown> = {
     hebrew: patch.hebrew,
