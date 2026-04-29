@@ -225,7 +225,7 @@ export default function SentencesPage() {
           onChange={(e) => setState({ ...state, input: e.target.value })}
           onKeyDown={(e) => { if (e.key === 'Enter') checkAnswer() }}
           placeholder="Type Hebrew…"
-          className="w-full border border-gray-300 rounded-lg px-4 py-3 text-xl text-right text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-gray-300 rounded-lg px-4 py-3 text-3xl text-right text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
 
         <HebrewKeyboard
@@ -258,7 +258,7 @@ export default function SentencesPage() {
 
         <div className="w-full rounded-xl border border-gray-200 p-4 text-center bg-white">
           <p className="text-xs text-gray-400 mb-1">Your answer</p>
-          <p className={`text-lg ${correct ? 'text-green-700' : 'text-gray-700'}`} dir="rtl">
+          <p className={`text-2xl ${correct ? 'text-green-700' : 'text-gray-700'}`} dir="rtl">
             {state.input || '—'}
           </p>
         </div>
@@ -278,7 +278,7 @@ export default function SentencesPage() {
               <span className="text-xs text-blue-300">Loading audio…</span>
             )}
           </div>
-          <p className="text-xl font-bold text-blue-900 text-center" dir="rtl">{current.hebrew}</p>
+          <p className="text-3xl font-bold text-blue-900 text-center" dir="rtl">{current.hebrew}</p>
         </div>
 
         <div className="flex gap-3 w-full">
@@ -311,7 +311,7 @@ export default function SentencesPage() {
     <div className="flex flex-col items-center min-h-screen p-6 pt-10 max-w-sm mx-auto gap-5">
       <div className="w-full rounded-xl border border-gray-200 p-4 text-center bg-white">
         <p className="text-sm text-gray-400 mb-1">{current.english}</p>
-        <p className="text-lg text-gray-900" dir="rtl">{current.hebrew}</p>
+        <p className="text-2xl text-gray-900" dir="rtl">{current.hebrew}</p>
       </div>
 
       <p className="text-sm text-gray-300 self-start">
