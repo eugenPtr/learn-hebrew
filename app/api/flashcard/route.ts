@@ -14,19 +14,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'count must be a positive integer' }, { status: 400 })
   }
 
-  let query = supabase
+  const selectQuery = supabase
     .from('vocabulary_items')
-    .select('id, hebrew, english, audio_url, last_used_at, last_mistake_at')
+    .select('id, hebrew, english, audio_url, last_used_at, last_mistake_at, lesson_id')
 
-  if (lessonId) {
-    query = query.eq('lesson_id', lessonId)
-  }
-
-  const { data, error } = await query
+  const { data, error } = await (lessonId
+    ? selectQuery.eq('lesson_id', lessonId)
+    : selectQuery)
 
   if (error) {
     console.error('[api/flashcard] GET failed:', error.message)
     return NextResponse.json({ error: `DB error: ${error.message}` }, { status: 500 })
+  }
+
+  if (lessonId) {
+    const wrong = (data ?? []).filter((r) => r.lesson_id !== lessonId)
+    if (wrong.length > 0) {
+      console.error('[api/flashcard] FILTER BUG — items with wrong lesson_id:', wrong.map((r) => r.id))
+    }
+    console.log(`[api/flashcard] lessonId=${lessonId} → ${(data ?? []).length} items`)
   }
 
   const items: VocabularyItem[] = (data ?? []).map((row) => ({
