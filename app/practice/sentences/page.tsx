@@ -95,6 +95,16 @@ export default function SentencesPage() {
     setState({ ...state, phase: 'feedback', feedback: '', rating })
   }
 
+  function advanceFromRevealed() {
+    if (state.phase !== 'revealed') return
+    const { theme, deck, index } = state
+    if (index + 1 >= deck.length) {
+      setState({ phase: 'summary', theme })
+    } else {
+      setState({ phase: 'running', theme, deck, index: index + 1, input: '' })
+    }
+  }
+
   function submitFeedback(feedback: string | null) {
     if (state.phase !== 'feedback') return
     const { theme, deck, index, rating } = state
@@ -285,6 +295,12 @@ export default function SentencesPage() {
             👎 Bad
           </button>
         </div>
+        <button
+          onClick={advanceFromRevealed}
+          className="w-full py-3 border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors font-medium"
+        >
+          Continue
+        </button>
       </div>
     )
   }
@@ -310,20 +326,12 @@ export default function SentencesPage() {
         autoFocus
       />
 
-      <div className="flex gap-3 w-full">
-        <button
-          onClick={() => submitFeedback(state.feedback.trim() || null)}
-          className={`flex-1 py-3 text-white rounded-lg font-medium transition-colors ${isGood ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
-        >
-          Submit
-        </button>
-        <button
-          onClick={() => submitFeedback(null)}
-          className="flex-1 py-3 border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors"
-        >
-          Continue
-        </button>
-      </div>
+      <button
+        onClick={() => submitFeedback(state.feedback.trim() || null)}
+        className={`w-full py-3 text-white rounded-lg font-medium transition-colors ${isGood ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
+      >
+        Submit
+      </button>
     </div>
   )
 }
