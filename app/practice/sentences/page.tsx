@@ -24,12 +24,13 @@ type State =
   | { phase: 'generating'; theme: Theme }
   | { phase: 'running'; theme: Theme; deck: Sentence[]; index: number; input: string }
   | { phase: 'revealed'; theme: Theme; deck: Sentence[]; index: number; input: string }
-  | { phase: 'feedback'; theme: Theme; deck: Sentence[]; index: number; input: string; feedback: string }
+  | { phase: 'feedback'; theme: Theme; deck: Sentence[]; index: number; input: string; feedback: string; rating: 'up' | 'down' }
   | { phase: 'summary'; theme: Theme }
 
 export default function SentencesPage() {
   const [state, setState] = useState<State>({ phase: 'loading-themes' })
   const [error, setError] = useState<string | null>(null)
+  const [audioUrls, setAudioUrls] = useState<Record<number, string>>({})
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -46,6 +47,7 @@ export default function SentencesPage() {
 
   async function pickTheme(theme: Theme) {
     setError(null)
+    setAudioUrls({})
     setState({ phase: 'generating', theme })
     try {
       const res = await fetch('/api/practice/sentences', {
@@ -62,9 +64,22 @@ export default function SentencesPage() {
         throw new Error('No sentences returned')
       }
       setState({ phase: 'running', theme, deck: sentences, index: 0, input: '' })
+
+      // Generate TTS for all sentences in the background (best-effort)
+      sentences.forEach((s, i) => {
+        fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: s.hebrew }),
+        })
+          .then((r) => r.json())
+          .then((data: { audioUrl?: string }) => {
+            if (data.audioUrl) setAudioUrls((prev) => ({ ...prev, [i]: data.audioUrl! }))
+          })
+          .catch(() => {})
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
-      // Return to theme picker; refresh themes list
       const themes = (await fetch('/api/themes').then((r) => r.json())) as Theme[]
       setState({ phase: 'picking', themes })
     }
@@ -75,9 +90,14 @@ export default function SentencesPage() {
     setState({ ...state, phase: 'revealed' })
   }
 
-  async function rate(rating: 'up' | 'down', feedback: string | null) {
-    if (state.phase !== 'revealed' && state.phase !== 'feedback') return
-    const { theme, deck, index } = state
+  function goToFeedback(rating: 'up' | 'down') {
+    if (state.phase !== 'revealed') return
+    setState({ ...state, phase: 'feedback', feedback: '', rating })
+  }
+
+  function submitFeedback(feedback: string | null) {
+    if (state.phase !== 'feedback') return
+    const { theme, deck, index, rating } = state
     const current = deck[index]
 
     fetch('/api/practice/sentences/rate', {
@@ -91,16 +111,8 @@ export default function SentencesPage() {
         rating,
         feedback,
       }),
-    }).catch(() => {
-      // Best-effort: a failed rate shouldn't block progression.
-    })
+    }).catch(() => {})
 
-    advance()
-  }
-
-  function advance() {
-    if (state.phase !== 'revealed' && state.phase !== 'feedback') return
-    const { theme, deck, index } = state
     if (index + 1 >= deck.length) {
       setState({ phase: 'summary', theme })
     } else {
@@ -180,7 +192,6 @@ export default function SentencesPage() {
     )
   }
 
-  // running / revealed / feedback all share deck + index
   const deck = state.deck
   const index = state.index
   const current = deck[index]
@@ -224,6 +235,8 @@ export default function SentencesPage() {
 
   if (state.phase === 'revealed') {
     const correct = normalizeHebrew(state.input) === normalizeHebrew(current.hebrew)
+    const audioUrl = audioUrls[index]
+
     return (
       <div className="flex flex-col items-center min-h-screen p-6 pt-10 max-w-sm mx-auto gap-5">
         <p className="self-end text-sm text-gray-400">{remaining} sentence{remaining !== 1 ? 's' : ''} left</p>
@@ -240,20 +253,33 @@ export default function SentencesPage() {
           </p>
         </div>
 
-        <div className="w-full rounded-xl bg-blue-50 border border-blue-200 p-4 text-center">
-          <p className="text-xs text-blue-500 mb-1">Correct</p>
-          <p className="text-xl font-bold text-blue-900" dir="rtl">{current.hebrew}</p>
+        <div className="w-full rounded-xl bg-blue-50 border border-blue-200 p-4">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs text-blue-500">Correct</p>
+            {audioUrl ? (
+              <button
+                onClick={() => new Audio(audioUrl).play()}
+                className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1 transition-colors"
+                aria-label="Play pronunciation"
+              >
+                <span>▶</span> Hear it
+              </button>
+            ) : (
+              <span className="text-xs text-blue-300">Loading audio…</span>
+            )}
+          </div>
+          <p className="text-xl font-bold text-blue-900 text-center" dir="rtl">{current.hebrew}</p>
         </div>
 
         <div className="flex gap-3 w-full">
           <button
-            onClick={() => rate('up', null)}
+            onClick={() => goToFeedback('up')}
             className="flex-1 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
           >
             👍 Good
           </button>
           <button
-            onClick={() => setState({ ...state, phase: 'feedback', feedback: '' })}
+            onClick={() => goToFeedback('down')}
             className="flex-1 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
           >
             👎 Bad
@@ -264,6 +290,7 @@ export default function SentencesPage() {
   }
 
   // feedback phase
+  const isGood = state.rating === 'up'
   return (
     <div className="flex flex-col items-center min-h-screen p-6 pt-10 max-w-sm mx-auto gap-5">
       <div className="w-full rounded-xl border border-gray-200 p-4 text-center bg-white">
@@ -271,27 +298,30 @@ export default function SentencesPage() {
         <p className="text-lg text-gray-900" dir="rtl">{current.hebrew}</p>
       </div>
 
-      <p className="text-sm text-gray-300">What was wrong with this sentence? (optional)</p>
+      <p className="text-sm text-gray-300 self-start">
+        {isGood ? 'Any notes on this sentence? (optional)' : 'What was wrong with this sentence? (optional)'}
+      </p>
       <textarea
         value={state.feedback}
         onChange={(e) => setState({ ...state, feedback: e.target.value })}
-        placeholder="e.g. too formal, weird word choice, ungrammatical…"
+        placeholder={isGood ? 'e.g. great example, used it in context…' : 'e.g. too formal, weird word choice, ungrammatical…'}
         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
         rows={3}
+        autoFocus
       />
 
       <div className="flex gap-3 w-full">
         <button
-          onClick={() => rate('down', state.feedback.trim() || null)}
-          className="flex-1 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors"
+          onClick={() => submitFeedback(state.feedback.trim() || null)}
+          className={`flex-1 py-3 text-white rounded-lg font-medium transition-colors ${isGood ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
         >
           Submit
         </button>
         <button
-          onClick={() => setState({ phase: 'revealed', theme: state.theme, deck, index, input: state.input })}
-          className="flex-1 py-3 border border-gray-300 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors"
+          onClick={() => submitFeedback(null)}
+          className="flex-1 py-3 border border-gray-600 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors"
         >
-          Cancel
+          Continue
         </button>
       </div>
     </div>
