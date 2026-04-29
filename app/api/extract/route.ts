@@ -5,7 +5,7 @@ export const maxDuration = 30
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-const SYSTEM_PROMPT = `You are a Hebrew language tutor assistant. Your job is to extract Hebrew vocabulary from handwritten lesson notes in the image, then provide correct English translations for each item.
+const SYSTEM_PROMPT = `You are a Hebrew language tutor assistant. Your job is to extract Hebrew vocabulary from handwritten lesson notes in the image, then provide correct English translations for each Hebrew item.
 
 Return ONLY a JSON object in this exact format:
 {
@@ -15,15 +15,16 @@ Return ONLY a JSON object in this exact format:
 }
 
 Rules:
+- ONLY extract text written in Hebrew characters (the Hebrew alphabet). Completely ignore all English words, Latin letters, numbers, phonetic transcriptions, or any non-Hebrew text visible in the image — even if they appear next to Hebrew words as translations or notes.
 - Extract EVERY Hebrew word, phrase, and inflected form visible in the image — err on the side of extracting MORE items, not fewer.
 - CRITICAL: If the image contains a conjugation table or paradigm (e.g. a preposition declined with pronoun suffixes, or a verb conjugated across persons), extract EACH individual form as its own separate item. Do not collapse a table into just its root/base word. For example, if you see a table for של (of), you must extract שלי, שלך, שלה, שלו, שלנו, שלכם, שלכן, שלהם, שלהן as separate items — not just של.
 - Common paradigm patterns to watch for: preposition+pronoun-suffix tables (של, על, ל, את, עם, אל, מ, ב, עד, …), verb conjugation grids, pronoun lists.
 - Also extract the base/root word itself (e.g. של, על, ל) if it is written as a heading or standalone word.
 - Extract complete phrases and idioms (e.g. אין עליך, של מי הספר) as single items.
-- Provide your own correct English translation for each item — do NOT copy English or phonetic text written in the notebook.
+- For each Hebrew item, generate your own correct English translation from your knowledge — never copy or adapt any English text visible in the image.
 - Write Hebrew without niqqud (no vowel points) — plain consonants only.
 - If the same Hebrew form appears more than once, include it only once.
-- If no Hebrew is found, return { "items": [] }.
+- If no Hebrew characters are found, return { "items": [] }.
 - Do not include anything other than the JSON object.`
 
 type VocabItem = { hebrew: string; english: string }
