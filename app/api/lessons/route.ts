@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 import { generateTtsAudio } from '@/lib/tts'
+import { embedText } from '@/lib/embeddings'
 
 type VocabItem = {
   hebrew: string
@@ -139,17 +140,22 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Insert net-new vocabulary items with TTS audio
+  // Insert net-new vocabulary items with TTS audio + embeddings
   if (newItems.length > 0) {
     const audioUrls: string[] = []
+    const embeddings: number[][] = []
     for (const item of newItems) {
       try {
-        const audioUrl = await generateTtsAudio(normalizeHebrew(item.hebrew))
+        const [audioUrl, embedding] = await Promise.all([
+          generateTtsAudio(normalizeHebrew(item.hebrew)),
+          embedText(item.english),
+        ])
         audioUrls.push(audioUrl)
+        embeddings.push(embedding)
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
-        console.error('[api/lessons] TTS failed for item:', item.hebrew, message)
-        return NextResponse.json({ error: `TTS generation failed: ${message}` }, { status: 502 })
+        console.error('[api/lessons] TTS/embed failed for item:', item.hebrew, message)
+        return NextResponse.json({ error: `TTS/embed failed: ${message}` }, { status: 502 })
       }
     }
 
@@ -158,6 +164,7 @@ export async function POST(req: NextRequest) {
       hebrew: normalizeHebrew(item.hebrew),
       english: item.english,
       audio_url: audioUrls[i],
+      embedding: embeddings[i] as unknown as string,
       pos: item.pos ?? null,
       gender: item.gender ?? null,
       binyan: item.binyan ?? null,
