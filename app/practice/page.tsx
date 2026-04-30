@@ -16,8 +16,9 @@ type CardResult = { itemId: string; mistakeMade: boolean }
 
 type State =
   | { phase: 'loading-lessons' }
-  | { phase: 'picking'; lessons: LessonSummary[] }
-  | { phase: 'loading'; lessons: LessonSummary[] }
+  | { phase: 'lesson-picking'; lessons: LessonSummary[] }
+  | { phase: 'count-picking'; lesson: LessonSummary; lessons: LessonSummary[] }
+  | { phase: 'loading'; lesson: LessonSummary; lessons: LessonSummary[]; count: number }
   | { phase: 'running'; deck: VocabularyItem[]; index: number; results: CardResult[]; input: string }
   | { phase: 'revealed'; deck: VocabularyItem[]; index: number; results: CardResult[]; input: string; audio: HTMLAudioElement | null }
   | { phase: 'summary'; results: CardResult[]; total: number }
@@ -41,30 +42,30 @@ export default function PracticePage() {
       .then((r) => r.json())
       .then((data: Array<{ id: string; title: string | null; created_at: string; word_count: number }>) => {
         const lessons: LessonSummary[] = data.map((l, i) => ({ ...l, position: i + 1 }))
-        setState({ phase: 'picking', lessons })
+        setState({ phase: 'lesson-picking', lessons })
       })
       .catch((err) => {
         setFetchError(err instanceof Error ? err.message : String(err))
-        setState({ phase: 'picking', lessons: [] })
+        setState({ phase: 'lesson-picking', lessons: [] })
       })
   }, [])
 
-  async function startSession(lesson: LessonSummary, lessons: LessonSummary[]) {
-    setState({ phase: 'loading', lessons })
+  async function startSession(lesson: LessonSummary, lessons: LessonSummary[], count: number) {
+    setState({ phase: 'loading', lesson, lessons, count })
     setFetchError(null)
     try {
-      const res = await fetch(`/api/flashcard?lessonId=${lesson.id}`)
+      const res = await fetch(`/api/flashcard?lessonId=${lesson.id}&count=${count}`)
       if (!res.ok) throw new Error(`Failed to load cards: ${res.status}`)
       const deck: VocabularyItem[] = await res.json()
       if (deck.length === 0) {
         setFetchError(`"${lesson.title ?? `Lesson ${lesson.position}`}" has no vocabulary items.`)
-        setState({ phase: 'picking', lessons })
+        setState({ phase: 'count-picking', lesson, lessons })
         return
       }
       setState({ phase: 'running', deck, index: 0, results: [], input: '' })
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : String(err))
-      setState({ phase: 'picking', lessons })
+      setState({ phase: 'count-picking', lesson, lessons })
     }
   }
 
@@ -141,22 +142,67 @@ export default function PracticePage() {
     )
   }
 
-  // --- Picking / Loading session ---
-  if (state.phase === 'picking' || state.phase === 'loading') {
-    const loading = state.phase === 'loading'
+  // --- Lesson picking ---
+  if (state.phase === 'lesson-picking') {
     return (
       <div className="flex flex-col min-h-screen gap-6 max-w-lg mx-auto p-6">
         <h1 className="text-2xl font-bold">Flashcard Practice</h1>
         <p className="text-gray-500 text-sm">Pick a lesson to practice.</p>
         {fetchError && <p className="text-red-600 text-sm">{fetchError}</p>}
-        {loading ? (
-          <p className="text-gray-400 text-sm text-center mt-4">Loading cards…</p>
-        ) : (
-          <LessonList
-            lessons={state.lessons}
-            onSelect={(lesson) => startSession(lesson, state.lessons)}
-          />
-        )}
+        <LessonList
+          lessons={state.lessons}
+          onSelect={(lesson) => setState({ phase: 'count-picking', lesson, lessons: state.lessons })}
+        />
+      </div>
+    )
+  }
+
+  // --- Count picking ---
+  if (state.phase === 'count-picking') {
+    const { lesson, lessons } = state
+    const lessonLabel = lesson.title ?? `Lesson ${lesson.position}`
+    return (
+      <div className="flex flex-col min-h-screen gap-6 max-w-lg mx-auto p-6">
+        <button
+          onClick={() => setState({ phase: 'lesson-picking', lessons })}
+          className="self-start text-gray-400 hover:text-gray-600 transition-colors"
+          aria-label="Back to lesson selection"
+        >
+          ← Back
+        </button>
+        <div>
+          <h1 className="text-2xl font-bold">{lessonLabel}</h1>
+          <p className="text-gray-500 text-sm mt-1">{lesson.word_count} words</p>
+        </div>
+        {fetchError && <p className="text-red-600 text-sm">{fetchError}</p>}
+        <p className="text-gray-600">How many words to practice?</p>
+        <div className="flex flex-col gap-3">
+          {[10, 20, 30].map((c) => (
+            <button
+              key={c}
+              disabled={lesson.word_count < c}
+              onClick={() => startSession(lesson, lessons, c)}
+              className="w-full py-3 rounded-xl border border-gray-200 bg-white font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            >
+              {c}
+            </button>
+          ))}
+          <button
+            onClick={() => startSession(lesson, lessons, lesson.word_count)}
+            className="w-full py-3 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 transition"
+          >
+            All ({lesson.word_count})
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // --- Loading session ---
+  if (state.phase === 'loading') {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-gray-400">Loading cards…</p>
       </div>
     )
   }

@@ -45,7 +45,8 @@ export async function GET(req: NextRequest) {
   }))
 
   if (lessonId) {
-    const selected = activeStrategy.select(items, Math.min(items.length, MAX_LESSON_COUNT))
+    const effectiveCount = countParam !== null ? Math.min(count, items.length) : Math.min(items.length, MAX_LESSON_COUNT)
+    const selected = activeStrategy.select(items, effectiveCount)
     return NextResponse.json(selected)
   }
 
