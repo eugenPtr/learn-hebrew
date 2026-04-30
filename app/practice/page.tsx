@@ -182,7 +182,7 @@ export default function PracticePage() {
               key={c}
               disabled={lesson.word_count < c}
               onClick={() => startSession(lesson, lessons, c)}
-              className="w-full py-3 rounded-xl border border-gray-200 bg-white font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              className="w-full py-3 rounded-xl border border-gray-200 bg-white text-gray-900 font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
               {c}
             </button>
