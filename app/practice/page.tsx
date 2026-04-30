@@ -27,11 +27,20 @@ export default function PracticePage() {
   const router = useRouter()
   const [state, setState] = useState<State>({ phase: 'loading-lessons' })
   const inputRef = useRef<HTMLInputElement>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const cardIndex = state.phase === 'running' || state.phase === 'revealed' ? state.index : -1
   useEffect(() => {
     if (state.phase === 'running') inputRef.current?.focus()
   }, [state.phase, cardIndex])
+
+  // Pre-load audio when a card is revealed so it's ready before the user taps Play
+  const revealedCardId = state.phase === 'revealed' ? state.deck[state.index].id : null
+  useEffect(() => {
+    if (state.phase !== 'revealed') return
+    const card = state.deck[state.index]
+    audioRef.current = card.audio_url ? new Audio(card.audio_url) : null
+  }, [revealedCardId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -318,7 +327,7 @@ export default function PracticePage() {
         <p className="text-3xl font-bold text-red-700" dir="rtl">{card.hebrew}</p>
         {card.audio_url && (
           <button
-            onClick={() => new Audio(card.audio_url!).play().catch(console.error)}
+            onClick={() => audioRef.current?.play().catch(console.error)}
             className="mt-3 px-4 py-1 text-sm border border-red-300 rounded-full text-red-600 hover:bg-red-100 transition-colors"
           >
             ▶ Play
