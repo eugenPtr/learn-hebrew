@@ -12,6 +12,15 @@ function normalize(s: string): string {
   return s.replace(/[֑-ׇ]/g, '').trim()
 }
 
+const BINYAN_PATTERNS: Record<string, { name: string; infinitive: string; msgPresent: string }> = {
+  paal:    { name: "Pa'al",     infinitive: 'לִXXוֹX',       msgPresent: 'XוֹXֵX' },
+  piel:    { name: "Pi'el",     infinitive: 'לְXַXֵX',       msgPresent: 'מְXַXֵX' },
+  hifil:   { name: "Hif'il",    infinitive: 'לְהַXXִיX',     msgPresent: 'מַXXִיX' },
+  hitpael: { name: "Hitpa'el",  infinitive: 'לְהִתְXַXֵX',   msgPresent: 'מִתְXַXֵX' },
+}
+
+const PRONOUNS = ['אֲנִי', 'אַתָּה', 'אַתְּ', 'הוּא', 'הִיא', 'אֲנַחְנוּ', 'אַתֶּם', 'הֵם', 'הֵן']
+
 type CardResult = { itemId: string; mistakeMade: boolean }
 
 type State =
@@ -41,6 +50,10 @@ export default function PracticePage() {
     const card = state.deck[state.index]
     audioRef.current = card.audio_url ? new Audio(card.audio_url) : null
   }, [revealedCardId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [conjugationsOpen, setConjugationsOpen] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches
+  )
 
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -325,6 +338,12 @@ export default function PracticePage() {
       <div className="w-full rounded-xl bg-red-50 border border-red-200 p-5 text-center">
         <p className="text-sm text-red-400 mb-1">Correct answer</p>
         <p className="text-3xl font-bold text-red-700" dir="rtl">{card.hebrew}</p>
+        {card.pos === 'verb' && card.binyan != null && BINYAN_PATTERNS[card.binyan] && (
+          <p className="mt-2 text-sm text-red-500">
+            {BINYAN_PATTERNS[card.binyan].name}{' '}
+            <span dir="rtl">{BINYAN_PATTERNS[card.binyan].infinitive} / {BINYAN_PATTERNS[card.binyan].msgPresent}</span>
+          </p>
+        )}
         {card.audio_url && (
           <button
             onClick={() => audioRef.current?.play().catch(console.error)}
@@ -334,6 +353,28 @@ export default function PracticePage() {
           </button>
         )}
       </div>
+
+      {card.pos === 'verb' && card.conjugations?.present && (
+        <details
+          open={conjugationsOpen}
+          onToggle={(e) => setConjugationsOpen((e.target as HTMLDetailsElement).open)}
+          className="w-full rounded-xl border border-gray-200 bg-white overflow-hidden"
+        >
+          <summary className="px-5 py-3 cursor-pointer text-sm font-medium text-gray-600 hover:bg-gray-50">
+            Conjugations
+          </summary>
+          <table className="w-full text-sm border-t border-gray-100">
+            <tbody>
+              {PRONOUNS.map((pronoun, i) => (
+                <tr key={pronoun} className="border-b border-gray-50 last:border-0">
+                  <td className="px-5 py-2 text-gray-500" dir="rtl">{pronoun}</td>
+                  <td className="px-5 py-2 font-medium text-gray-800" dir="rtl">{card.conjugations!.present[i]}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      )}
 
       <button
         onClick={continueAfterRevealed}

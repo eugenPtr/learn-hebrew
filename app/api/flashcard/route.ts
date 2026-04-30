@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
   const selectQuery = supabase
     .from('vocabulary_items')
-    .select('id, hebrew, english, audio_url, last_used_at, last_mistake_at, lesson_id')
+    .select('id, hebrew, english, audio_url, last_used_at, last_mistake_at, lesson_id, pos, binyan, conjugations')
 
   const { data, error } = await (lessonId
     ? selectQuery.eq('lesson_id', lessonId)
@@ -42,6 +42,9 @@ export async function GET(req: NextRequest) {
     audio_url: row.audio_url ?? null,
     last_used_at: row.last_used_at ?? null,
     last_mistake_at: row.last_mistake_at ?? null,
+    pos: row.pos ?? null,
+    binyan: row.binyan ?? null,
+    conjugations: row.conjugations ?? null,
   }))
 
   if (lessonId) {

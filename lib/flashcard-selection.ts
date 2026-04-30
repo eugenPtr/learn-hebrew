@@ -5,6 +5,9 @@ export type VocabularyItem = {
   audio_url: string | null
   last_used_at: string | null
   last_mistake_at: string | null
+  pos: string | null
+  binyan: string | null
+  conjugations: { present: string[] } | null
 }
 
 export type Strategy = {
