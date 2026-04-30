@@ -20,7 +20,7 @@ type State =
   | { phase: 'count-picking'; lesson: LessonSummary; lessons: LessonSummary[] }
   | { phase: 'loading'; lesson: LessonSummary; lessons: LessonSummary[]; count: number }
   | { phase: 'running'; deck: VocabularyItem[]; index: number; results: CardResult[]; input: string }
-  | { phase: 'revealed'; deck: VocabularyItem[]; index: number; results: CardResult[]; input: string; audio: HTMLAudioElement | null }
+  | { phase: 'revealed'; deck: VocabularyItem[]; index: number; results: CardResult[]; input: string }
   | { phase: 'summary'; results: CardResult[]; total: number }
 
 export default function PracticePage() {
@@ -84,8 +84,7 @@ export default function PracticePage() {
       }
     } else {
       const newResults = [...results, { itemId: card.id, mistakeMade: true }]
-      const audio = card.audio_url ? new Audio(card.audio_url) : null
-      setState({ phase: 'revealed', deck, index, results: newResults, input, audio })
+      setState({ phase: 'revealed', deck, index, results: newResults, input })
     }
   }
 
@@ -94,8 +93,7 @@ export default function PracticePage() {
     const { deck, index, results, input } = state
     const card = deck[index]
     const newResults = [...results, { itemId: card.id, mistakeMade: true }]
-    const audio = card.audio_url ? new Audio(card.audio_url) : null
-    setState({ phase: 'revealed', deck, index, results: newResults, input, audio })
+    setState({ phase: 'revealed', deck, index, results: newResults, input })
   }
 
   function continueAfterRevealed() {
@@ -298,7 +296,6 @@ export default function PracticePage() {
   }
 
   // --- Revealed ---
-  const { audio } = state
   return (
     <div className="flex flex-col items-center min-h-screen p-6 pt-10 max-w-sm mx-auto gap-6">
       <div className="w-full flex justify-between items-center">
@@ -319,9 +316,9 @@ export default function PracticePage() {
       <div className="w-full rounded-xl bg-red-50 border border-red-200 p-5 text-center">
         <p className="text-sm text-red-400 mb-1">Correct answer</p>
         <p className="text-3xl font-bold text-red-700" dir="rtl">{card.hebrew}</p>
-        {audio && (
+        {card.audio_url && (
           <button
-            onClick={() => audio.play()}
+            onClick={() => new Audio(card.audio_url!).play().catch(console.error)}
             className="mt-3 px-4 py-1 text-sm border border-red-300 rounded-full text-red-600 hover:bg-red-100 transition-colors"
           >
             ▶ Play
