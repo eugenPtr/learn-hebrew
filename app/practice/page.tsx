@@ -47,13 +47,28 @@ export default function PracticePage() {
   const revealedCardId = state.phase === 'revealed' ? state.deck[state.index].id : null
   useEffect(() => {
     if (state.phase !== 'revealed') return
+    setAudioError(false)
+    setCopied(false)
     const card = state.deck[state.index]
-    audioRef.current = card.audio_url ? new Audio(card.audio_url) : null
+    const audio = card.audio_url ? new Audio(card.audio_url) : null
+    if (audio) {
+      audio.addEventListener('error', () => {
+        const err = audio.error
+        console.error('[flashcard audio] load error', { code: err?.code, message: err?.message, url: card.audio_url })
+        setAudioError(true)
+      })
+      audio.addEventListener('loadedmetadata', () => {
+        console.log('[flashcard audio] loaded', { duration: audio.duration, url: card.audio_url })
+      })
+    }
+    audioRef.current = audio
   }, [revealedCardId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [conjugationsOpen, setConjugationsOpen] = useState(() =>
     typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches
   )
+  const [audioError, setAudioError] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -295,8 +310,24 @@ export default function PracticePage() {
         />
 
         <HebrewKeyboard
-          onKey={(char) => setState({ ...state, input: input + char })}
-          onBackspace={() => setState({ ...state, input: input.slice(0, -1) })}
+          onKey={(char) => {
+            setState({ ...state, input: input + char })
+            requestAnimationFrame(() => {
+              if (inputRef.current) {
+                const len = inputRef.current.value.length
+                inputRef.current.setSelectionRange(len, len)
+              }
+            })
+          }}
+          onBackspace={() => {
+            setState({ ...state, input: input.slice(0, -1) })
+            requestAnimationFrame(() => {
+              if (inputRef.current) {
+                const len = inputRef.current.value.length
+                inputRef.current.setSelectionRange(len, len)
+              }
+            })
+          }}
         />
 
         <div className="flex gap-3 w-full">
@@ -344,13 +375,33 @@ export default function PracticePage() {
             <span dir="rtl">{BINYAN_PATTERNS[card.binyan].infinitive} / {BINYAN_PATTERNS[card.binyan].msgPresent}</span>
           </p>
         )}
+        <button
+          onClick={() => navigator.clipboard.writeText(card.hebrew).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) }).catch(console.error)}
+          className="mt-2 text-xs text-red-400 hover:text-red-600 flex items-center gap-1 mx-auto transition-colors"
+          aria-label="Copy Hebrew text"
+        >
+          {copied ? 'Copied!' : (
+            <>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copy
+            </>
+          )}
+        </button>
         {card.audio_url && (
-          <button
-            onClick={() => audioRef.current?.play().catch(console.error)}
-            className="mt-3 px-4 py-1 text-sm border border-red-300 rounded-full text-red-600 hover:bg-red-100 transition-colors"
-          >
-            ▶ Play
-          </button>
+          <div className="mt-2 flex flex-col items-center gap-1">
+            <button
+              onClick={() => {
+                setAudioError(false)
+                audioRef.current?.play()
+                  .then(() => console.log('[flashcard audio] playing'))
+                  .catch((err) => { console.error('[flashcard audio] play() rejected:', err); setAudioError(true) })
+              }}
+              className="px-4 py-1 text-sm border border-red-300 rounded-full text-red-600 hover:bg-red-100 transition-colors"
+            >
+              ▶ Play
+            </button>
+            {audioError && <p className="text-xs text-red-400">Audio unavailable</p>}
+          </div>
         )}
       </div>
 

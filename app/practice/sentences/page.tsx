@@ -37,7 +37,11 @@ export default function SentencesPage() {
   const [state, setState] = useState<State>({ phase: 'loading-themes' })
   const [error, setError] = useState<string | null>(null)
   const [audioUrls, setAudioUrls] = useState<Record<number, string>>({})
+  const [copied, setCopied] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const sentenceIndex = (state.phase === 'running' || state.phase === 'revealed' || state.phase === 'feedback') ? state.index : -1
+  useEffect(() => { setCopied(false) }, [sentenceIndex])
 
   useEffect(() => {
     if (isItemIdsMode) {
@@ -294,8 +298,24 @@ export default function SentencesPage() {
         />
 
         <HebrewKeyboard
-          onKey={(char) => setState({ ...state, input: state.input + char })}
-          onBackspace={() => setState({ ...state, input: state.input.slice(0, -1) })}
+          onKey={(char) => {
+            setState({ ...state, input: state.input + char })
+            requestAnimationFrame(() => {
+              if (inputRef.current) {
+                const len = inputRef.current.value.length
+                inputRef.current.setSelectionRange(len, len)
+              }
+            })
+          }}
+          onBackspace={() => {
+            setState({ ...state, input: state.input.slice(0, -1) })
+            requestAnimationFrame(() => {
+              if (inputRef.current) {
+                const len = inputRef.current.value.length
+                inputRef.current.setSelectionRange(len, len)
+              }
+            })
+          }}
         />
 
         <button
@@ -340,17 +360,40 @@ export default function SentencesPage() {
         <div className="w-full rounded-xl bg-blue-50 border border-blue-200 p-4">
           <div className="flex items-center justify-between mb-1">
             <p className="text-xs text-blue-500">Correct</p>
-            {audioUrl ? (
+            <div className="flex items-center gap-3">
               <button
-                onClick={() => new Audio(audioUrl).play()}
-                className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1 transition-colors"
-                aria-label="Play pronunciation"
+                onClick={() => navigator.clipboard.writeText(current.hebrew).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) }).catch(console.error)}
+                className="text-blue-400 hover:text-blue-600 transition-colors"
+                aria-label="Copy Hebrew text"
               >
-                <span>▶</span> Hear it
+                {copied ? <span className="text-xs">Copied!</span> : (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                )}
               </button>
-            ) : (
-              <span className="text-xs text-blue-300">Loading audio…</span>
-            )}
+              {audioUrl ? (
+                <button
+                  onClick={() => {
+                    const audio = new Audio(audioUrl)
+                    audio.addEventListener('error', () => {
+                      const err = audio.error
+                      console.error('[sentence audio] load error', { code: err?.code, message: err?.message, url: audioUrl })
+                    })
+                    audio.addEventListener('loadedmetadata', () => {
+                      console.log('[sentence audio] loaded', { duration: audio.duration, url: audioUrl })
+                    })
+                    audio.play()
+                      .then(() => console.log('[sentence audio] playing'))
+                      .catch((err) => console.error('[sentence audio] play() rejected:', err))
+                  }}
+                  className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1 transition-colors"
+                  aria-label="Play pronunciation"
+                >
+                  <span>▶</span> Hear it
+                </button>
+              ) : (
+                <span className="text-xs text-blue-300">Loading audio…</span>
+              )}
+            </div>
           </div>
           <p className="text-3xl font-bold text-blue-900 text-center" dir="rtl">{current.hebrew}</p>
         </div>
