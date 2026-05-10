@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import HebrewKeyboard from '@/components/HebrewKeyboard'
@@ -29,6 +29,14 @@ type State =
   | { phase: 'summary'; theme: Theme | null }
 
 export default function SentencesPage() {
+  return (
+    <Suspense>
+      <SentencesPageInner />
+    </Suspense>
+  )
+}
+
+function SentencesPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const itemIdsParam = searchParams.get('itemIds')
